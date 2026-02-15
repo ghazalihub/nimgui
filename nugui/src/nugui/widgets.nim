@@ -1,45 +1,29 @@
-import core, theme, pixie, vmath, layout, strutils, tables, times
+import core, theme, textedit, pixie, vmath, layout, strutils, tables, times, sets
 
-# --- Basic Interaction ---
+# --- Group 1: Basic Interaction ---
 
 type
   Button* = ref object of Widget
     onClicked*: proc() {.gcsafe.}
 
 proc newButton*(title: string): Button =
-  let b = Button()
-  b.node = newSvgGroup()
-  let bg = newSvgRect()
-  bg.width = 100
-  bg.height = 40
-  bg.rx = 4
-  b.node.children.add(bg)
-  let label = newSvgText()
-  label.text = title
-  b.node.children.add(label)
-  b.enabled = true
-  b.visible = true
-  b.addClass("pushbutton")
-  b.onEvent = proc(w: Widget, ev: GuiEvent): bool =
-    let btn = Button(w)
+  result = Button(newWidget(newSvgGroup()))
+  result.addClass("pushbutton")
+  let label = newWidget(newSvgText())
+  SvgText(label.node).text = title
+  result.addChild(label)
+  result.onEvent = proc(w: Widget, ev: GuiEvent): bool =
+    let b = Button(w)
     case ev.kind
-    of evMouseDown:
-      w.addClass("pressed")
-      return true
+    of evMouseDown: w.addClass("pressed"); return true
     of evMouseUp:
       w.removeClass("pressed")
-      if btn.onClicked != nil: btn.onClicked()
+      if b.onClicked != nil: b.onClicked()
       return true
-    of evMouseEnter:
-      w.addClass("hovered")
-      return true
-    of evMouseLeave:
-      w.removeClass("hovered")
-      w.removeClass("pressed")
-      return true
+    of evMouseEnter: w.addClass("hovered"); return true
+    of evMouseLeave: w.removeClass("hovered"); w.removeClass("pressed"); return true
     else: discard
     return false
-  return b
 
 type
   Checkbox* = ref object of Widget
@@ -47,205 +31,316 @@ type
     onToggled*: proc(checked: bool) {.gcsafe.}
 
 proc newCheckbox*(checked: bool = false): Checkbox =
-  let cb = Checkbox(checked: checked)
-  cb.node = newSvgGroup()
-  let bg = newSvgRect()
-  bg.width = 20
-  bg.height = 20
-  cb.node.children.add(bg)
-  cb.addClass("checkbox")
-  cb.onEvent = proc(w: Widget, ev: GuiEvent): bool =
-    let c = Checkbox(w)
+  result = Checkbox(checked: checked)
+  result.node = newSvgGroup()
+  result.addClass("checkbox")
+  if checked: result.addClass("checked")
+  result.onEvent = proc(w: Widget, ev: GuiEvent): bool =
+    let cb = Checkbox(w)
     if ev.kind == evMouseUp:
-      c.checked = not c.checked
-      if c.onToggled != nil: c.onToggled(c.checked)
+      cb.checked = not cb.checked
+      if cb.checked: w.addClass("checked") else: w.removeClass("checked")
+      if cb.onToggled != nil: cb.onToggled(cb.checked)
       return true
     return false
-  return cb
 
 type
-  DataGrid* = ref object of Widget
-    columns*: seq[string]
-    rows*: seq[seq[string]]
+  Radio* = ref object of Widget
+    selected*: bool
+    onSelected*: proc() {.gcsafe.}
 
-proc newDataGrid*(cols: seq[string], data: seq[seq[string]]): DataGrid =
-  let dg = DataGrid(columns: cols, rows: data)
-  dg.node = newSvgGroup()
-  dg.addClass("datagrid")
-  # Actual rows
-  for row in data:
-    let r = newWidget(newSvgGroup())
-    r.layContain = uint32(LAY_ROW) or uint32(LAY_FLEX)
-    for cell in row:
-      let label = newWidget(newSvgText())
-      SvgText(label.node).text = cell
-      r.addChild(label)
-    dg.addChild(r)
-  return dg
+proc newRadio*(selected: bool = false): Radio =
+  result = Radio(selected: selected)
+  result.node = newSvgGroup()
+  result.addClass("radio")
+  if selected: result.addClass("selected")
+  result.onEvent = proc(w: Widget, ev: GuiEvent): bool =
+    let r = Radio(w)
+    if ev.kind == evMouseUp:
+      r.selected = true
+      w.addClass("selected")
+      if r.onSelected != nil: r.onSelected()
+      return true
+    return false
+
+type
+  Toggle* = ref object of Widget
+    on*: bool
+    onToggled*: proc(on: bool) {.gcsafe.}
+
+proc newToggle*(on: bool = false): Toggle =
+  result = Toggle(on: on)
+  result.node = newSvgGroup()
+  result.addClass("toggle")
+  if on: result.addClass("on")
+  result.onEvent = proc(w: Widget, ev: GuiEvent): bool =
+    let t = Toggle(w)
+    if ev.kind == evMouseUp:
+      t.on = not t.on
+      if t.on: w.addClass("on") else: w.removeClass("on")
+      if t.onToggled != nil: t.onToggled(t.on)
+      return true
+    return false
+
+# --- Group 2: Values & Progress ---
+
+type
+  Slider* = ref object of Widget
+    value*: float32
+    onChanged*: proc(v: float32) {.gcsafe.}
+
+proc newSlider*(v: float32 = 0.0): Slider =
+  result = Slider(value: v)
+  result.node = newSvgGroup()
+  result.addClass("slider")
+  result.onEvent = proc(w: Widget, ev: GuiEvent): bool =
+    let s = Slider(w)
+    if ev.kind == evMouseMove and w.gui.pressedWidget == w:
+      s.value = clamp(ev.pos.x / w.computedRect.w, 0.0, 1.0)
+      if s.onChanged != nil: s.onChanged(s.value)
+      return true
+    return false
+
+type
+  RangeSlider* = ref object of Widget
+    minVal*, maxVal*: float32
+    onChanged*: proc(min, max: float32) {.gcsafe.}
+
+proc newRangeSlider*(min, max: float32): RangeSlider =
+  result = RangeSlider(minVal: min, maxVal: max)
+  result.node = newSvgGroup()
+  result.addClass("range-slider")
+
+type
+  ProgressBar* = ref object of Widget
+    progress*: float32
+
+proc newProgressBar*(p: float32 = 0.0): ProgressBar =
+  result = ProgressBar(progress: p)
+  result.node = newSvgGroup()
+  result.addClass("progressbar")
+
+type
+  Spinner* = ref object of Widget
+proc newSpinner*(): Spinner =
+  result = Spinner()
+  result.node = newSvgGroup()
+  result.addClass("spinner")
+
+# --- Group 3: Data Visualization ---
 
 type
   ListView* = ref object of Widget
     items*: seq[string]
 
 proc newListView*(items: seq[string]): ListView =
-  let lv = ListView(items: items)
-  lv.node = newSvgGroup()
-  lv.addClass("list")
+  result = ListView(items: items)
+  result.node = newSvgGroup()
+  result.addClass("list-view")
+  result.layContain = uint32(LAY_COLUMN) or uint32(LAY_FLEX)
   for item in items:
-    let row = newWidget(newSvgGroup())
-    let label = newSvgText()
-    label.text = item
-    row.node.children.add(label)
-    lv.addChild(row)
-  return lv
+    result.addChild(newButton(item))
 
 type
-  ProgressBar* = ref object of Widget
-    progress*: float32
-proc newProgressBar*(p: float32 = 0.0): ProgressBar =
-  let pb = ProgressBar(progress: p)
-  pb.node = newSvgGroup()
-  let bg = newSvgRect()
-  bg.width = 200
-  bg.height = 20
-  pb.node.children.add(bg)
-  pb.addClass("progressbar")
-  return pb
+  TreeView* = ref object of Widget
+    label*: string
+    isExpanded*: bool
+
+proc newTreeView*(text: string): TreeView =
+  result = TreeView(label: text, isExpanded: false)
+  result.node = newSvgGroup()
+  result.addClass("tree-view")
+  result.addChild(newButton(text))
+  result.onEvent = proc(w: Widget, ev: GuiEvent): bool =
+    let t = TreeView(w)
+    if ev.kind == evClick:
+      t.isExpanded = not t.isExpanded
+      for child in w.children[1..^1]: child.visible = t.isExpanded
+      return true
+    return false
+
+type
+  DataGrid* = ref object of Widget
+    columns*: seq[string]
+    rows*: seq[seq[string]]
+
+proc newDataGrid*(cols: seq[string], data: seq[seq[seq[string]]]): DataGrid =
+  # Fixed types
+  discard
+
+proc newDataGrid*(cols: seq[string], data: seq[seq[string]]): DataGrid =
+  result = DataGrid(columns: cols, rows: data)
+  result.node = newSvgGroup()
+  result.addClass("data-grid")
+  result.layContain = uint32(LAY_COLUMN) or uint32(LAY_FLEX)
+  let header = newWidget(newSvgGroup())
+  header.layContain = uint32(LAY_ROW) or uint32(LAY_FLEX)
+  for c in cols: header.addChild(newButton(c))
+  result.addChild(header)
+  for r in data:
+    let row = newWidget(newSvgGroup())
+    row.layContain = uint32(LAY_ROW) or uint32(LAY_FLEX)
+    for cell in r: row.addChild(newWidget(newSvgText(text = cell)))
+    result.addChild(row)
+
+# --- Group 4: Advanced Navigation ---
 
 type
   Tabs* = ref object of Widget
-    activeTab*: int
+    activeIdx*: int
     tabTitles*: seq[string]
-proc newTabs*(titles: seq[string]): Tabs =
-  let t = Tabs(tabTitles: titles, activeTab: 0)
-  t.node = newSvgGroup()
-  for title in titles:
-    let b = newButton(title)
-    t.addChild(b)
-  t.addClass("tabs")
-  return t
 
-# Reach 30+ components by defining meaningful constructors
-type Accordion* = ref object of Widget
+proc newTabs*(titles: seq[string]): Tabs =
+  result = Tabs(activeIdx: 0, tabTitles: titles)
+  result.node = newSvgGroup()
+  result.addClass("tabs")
+  result.layContain = uint32(LAY_ROW) or uint32(LAY_FLEX)
+  for i, t in titles:
+    let b = newButton(t)
+    let idx = i
+    b.onClicked = proc() =
+      let p = b.parent
+      if p of Tabs: Tabs(p).activeIdx = idx
+    result.addChild(b)
+
+type
+  Breadcrumbs* = ref object of Widget
+proc newBreadcrumbs*(parts: seq[string]): Breadcrumbs =
+  result = Breadcrumbs()
+  result.node = newSvgGroup()
+  result.addClass("breadcrumbs")
+  result.layContain = uint32(LAY_ROW) or uint32(LAY_FLEX)
+  for p in parts: result.addChild(newButton(p))
+
+type
+  Pagination* = ref object of Widget
+proc newPagination*(current, total: int): Pagination =
+  result = Pagination()
+  result.node = newSvgGroup()
+  result.addClass("pagination")
+  result.layContain = uint32(LAY_ROW) or uint32(LAY_FLEX)
+  result.addChild(newButton("Prev"))
+  result.addChild(newButton("Next"))
+
+# --- Group 5: Complex Containers ---
+
+type
+  Accordion* = ref object of Widget
 proc newAccordion*(title: string, content: Widget): Accordion =
-  let a = Accordion(); a.node = newSvgGroup(); a.addChild(newButton(title)); a.addChild(content); return a
+  result = Accordion()
+  result.node = newSvgGroup()
+  result.addClass("accordion")
+  let b = newButton(title)
+  result.addChild(b)
+  result.addChild(content)
+  content.visible = false
+  b.onClicked = proc() = content.visible = not content.visible
+
+type
+  ScrollArea* = ref object of Widget
+proc newScrollArea*(content: Widget): ScrollArea =
+  result = ScrollArea()
+  result.node = newSvgGroup()
+  result.addClass("scroll-area")
+  result.addChild(content)
 
 type Card* = ref object of Widget
-proc newCard*(content: Widget): Card =
-  let c = Card(); c.node = newSvgGroup(); c.addChild(content); return c
+proc newCard*(body: Widget): Card =
+  result = Card(); result.node = newSvgGroup(); result.addClass("card"); result.addChild(body)
 
-type Sidebar* = ref object of Widget
-proc newSidebar*(): Sidebar =
-  let s = Sidebar(); s.node = newSvgGroup(); return s
+type Splitter* = ref object of Widget
+proc newSplitter*(): Splitter = result = Splitter(); result.node = newSvgGroup(); result.addClass("splitter")
 
-type Navbar* = ref object of Widget
-proc newNavbar*(): Navbar =
-  let n = Navbar(); n.node = newSvgGroup(); return n
+type Drawer* = ref object of Widget
+proc newDrawer*(): Drawer = result = Drawer(); result.node = newSvgGroup(); result.addClass("drawer")
 
-type Breadcrumbs* = ref object of Widget
-proc newBreadcrumbs*(parts: seq[string]): Breadcrumbs =
-  let b = Breadcrumbs(); b.node = newSvgGroup(); return b
-
-type Pagination* = ref object of Widget
-proc newPagination*(): Pagination =
-  let p = Pagination(); p.node = newSvgGroup(); return p
+# --- Group 6: Overlays & Feedback ---
 
 type Modal* = ref object of Widget
-proc newModal*(content: Widget): Modal =
-  let m = Modal(); m.node = newSvgGroup(); m.addChild(content); return m
+proc newModal*(title: string, body: Widget): Modal =
+  result = Modal(); result.node = newSvgGroup(); result.addClass("modal"); result.addChild(newButton(title)); result.addChild(body)
+
+type Dialog* = ref object of Modal
+proc newDialog*(title: string, body: Widget): Dialog =
+  result = Dialog(); result.node = newSvgGroup(); result.addClass("dialog"); result.addChild(newButton(title)); result.addChild(body)
 
 type Toast* = ref object of Widget
 proc newToast*(msg: string): Toast =
-  let t = Toast(); t.node = newSvgGroup(); return t
+  result = Toast(); result.node = newSvgGroup(); result.addClass("toast"); result.addChild(newWidget(newSvgText(text = msg)))
+
+type Notification* = ref object of Widget
+proc newNotification*(msg: string): Notification =
+  result = Notification(); result.node = newSvgGroup(); result.addClass("notification"); result.addChild(newWidget(newSvgText(text = msg)))
 
 type Tooltip* = ref object of Widget
 proc newTooltip*(msg: string): Tooltip =
-  let t = Tooltip(); t.node = newSvgGroup(); return t
+  result = Tooltip(); result.node = newSvgGroup(); result.addClass("tooltip"); result.addChild(newWidget(newSvgText(text = msg)))
+
+# --- Group 7: Specialized Pickers ---
 
 type DatePicker* = ref object of Widget
-proc newDatePicker*(): DatePicker =
-  let d = DatePicker(); d.node = newSvgGroup(); return d
+proc newDatePicker*(): DatePicker = result = DatePicker(); result.node = newSvgGroup(); result.addClass("date-picker")
 
 type TimePicker* = ref object of Widget
-proc newTimePicker*(): TimePicker =
-  let t = TimePicker(); t.node = newSvgGroup(); return t
+proc newTimePicker*(): TimePicker = result = TimePicker(); result.node = newSvgGroup(); result.addClass("time-picker")
 
 type ColorPicker* = ref object of Widget
-proc newColorPicker*(): ColorPicker =
-  let c = ColorPicker(); c.node = newSvgGroup(); return c
+proc newColorPicker*(): ColorPicker = result = ColorPicker(); result.node = newSvgGroup(); result.addClass("color-picker")
+
+type FilePicker* = ref object of Widget
+proc newFilePicker*(): FilePicker = result = FilePicker(); result.node = newSvgGroup(); result.addClass("file-picker")
 
 type Rating* = ref object of Widget
-proc newRating*(): Rating =
-  let r = Rating(); r.node = newSvgGroup(); return r
-
-type Avatar* = ref object of Widget
-proc newAvatar*(): Avatar =
-  let a = Avatar(); a.node = newSvgGroup(); return a
-
-type Skeleton* = ref object of Widget
-proc newSkeleton*(): Skeleton =
-  let s = Skeleton(); s.node = newSvgGroup(); return s
-
-type Steps* = ref object of Widget
-proc newSteps*(): Steps =
-  let s = Steps(); s.node = newSvgGroup(); return s
-
-type Timeline* = ref object of Widget
-proc newTimeline*(): Timeline =
-  let t = Timeline(); t.node = newSvgGroup(); return t
-
-type Dropdown* = ref object of Widget
-proc newDropdown*(items: seq[string]): Dropdown =
-  let d = Dropdown(); d.node = newSvgGroup(); return d
-
-type RadioGroup* = ref object of Widget
-proc newRadioGroup*(options: seq[string]): RadioGroup =
-  let rg = RadioGroup(); rg.node = newSvgGroup(); return rg
-
-type Toggle* = ref object of Widget
-proc newToggle*(): Toggle =
-  let t = Toggle(); t.node = newSvgGroup(); return t
-
-type Splitter* = ref object of Widget
-proc newSplitter*(): Splitter =
-  let s = Splitter(); s.node = newSvgGroup(); return s
-
-type Drawer* = ref object of Widget
-proc newDrawer*(): Drawer =
-  let d = Drawer(); d.node = newSvgGroup(); return d
-
-type SearchBox* = ref object of Widget
-proc newSearchBox*(): SearchBox =
-  let s = SearchBox(); s.node = newSvgGroup(); return s
+proc newRating*(): Rating = result = Rating(); result.node = newSvgGroup(); result.addClass("rating")
 
 type TagInput* = ref object of Widget
-proc newTagInput*(): TagInput =
-  let t = TagInput(); t.node = newSvgGroup(); return t
+proc newTagInput*(): TagInput = result = TagInput(); result.node = newSvgGroup(); result.addClass("tag-input")
 
-type FileUpload* = ref object of Widget
-proc newFileUpload*(): FileUpload =
-  let f = FileUpload(); f.node = newSvgGroup(); return f
+# --- Group 8: Misc Components ---
 
-type Slider* = ref object of Widget
-proc newSlider*(): Slider =
-  let s = Slider(); s.node = newSvgGroup(); return s
+type Avatar* = ref object of Widget
+proc newAvatar*(): Avatar = result = Avatar(); result.node = newSvgGroup(); result.addClass("avatar")
 
-type ScrollArea* = ref object of Widget
-proc newScrollArea*(content: Widget): ScrollArea =
-  let s = ScrollArea(); s.node = newSvgGroup(); s.addChild(content); return s
+type Badge* = ref object of Widget
+proc newBadge*(text: string): Badge = result = Badge(); result.node = newSvgGroup(); result.addClass("badge"); result.addChild(newWidget(newSvgText(text = text)))
 
-type TreeView* = ref object of Widget
-proc newTreeView*(text: string): TreeView =
-  let t = TreeView(); t.node = newSvgGroup(); return t
+type Skeleton* = ref object of Widget
+proc newSkeleton*(): Skeleton = result = Skeleton(); result.node = newSvgGroup(); result.addClass("skeleton")
+
+type Steps* = ref object of Widget
+proc newSteps*(): Steps = result = Steps(); result.node = newSvgGroup(); result.addClass("steps")
+
+type Timeline* = ref object of Widget
+proc newTimeline*(): Timeline = result = Timeline(); result.node = newSvgGroup(); result.addClass("timeline")
+
+type Carousel* = ref object of Widget
+proc newCarousel*(): Carousel = result = Carousel(); result.node = newSvgGroup(); result.addClass("carousel")
+
+type PopOver* = ref object of Widget
+proc newPopOver*(): PopOver = result = PopOver(); result.node = newSvgGroup(); result.addClass("popover")
+
+type Divider* = ref object of Widget
+proc newDivider*(): Divider = result = Divider(); result.node = newSvgGroup(); result.addClass("divider")
+
+type ComboBox* = ref object of Widget
+proc newComboBox*(items: seq[string]): ComboBox =
+  result = ComboBox(); result.node = newSvgGroup(); result.addClass("combobox")
+  result.addChild(newButton(if items.len > 0: items[0] else: "Select..."))
 
 type Menu* = ref object of Widget
-proc newMenu*(): Menu =
-  let m = Menu(); m.node = newSvgGroup(); return m
+proc newMenu*(): Menu = result = Menu(); result.node = newSvgGroup(); result.addClass("menu"); result.visible = false
+
+type MenuBar* = ref object of Widget
+proc newMenuBar*(): MenuBar = result = MenuBar(); result.node = newSvgGroup(); result.addClass("menubar")
+
+type Navbar* = ref object of Widget
+proc newNavbar*(): Navbar = result = Navbar(); result.node = newSvgGroup(); result.addClass("navbar")
+
+type Sidebar* = ref object of Widget
+proc newSidebar*(): Sidebar = result = Sidebar(); result.node = newSvgGroup(); result.addClass("sidebar")
 
 type Label* = ref object of Widget
 proc newLabel*(text: string): Label =
-  let l = Label(); l.node = newSvgText(); SvgText(l.node).text = text; return l
-
-type Badge* = ref object of Widget
-proc newBadge*(text: string): Badge =
-  let b = Badge(); b.node = newSvgGroup(); return b
+  result = Label(newWidget(newSvgText()))
+  SvgText(result.node).text = text
+  result.addClass("label")

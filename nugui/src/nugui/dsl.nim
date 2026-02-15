@@ -44,10 +44,11 @@ template uiLabel*(textStr: string) =
   let p = currentParent()
   if p != nil: p.addChild(l)
 
-template uiCheckbox*(labelStr: string, checkedVal: bool = false) =
+template uiCheckbox*(labelStr: string, checkedVal: bool = false, onToggledProc: proc(c: bool) = nil) =
   let r = newWidget(newSvgGroup())
   r.layContain = uint32(LAY_ROW) or uint32(LAY_FLEX)
   let cb = newCheckbox(checkedVal)
+  cb.onToggled = onToggledProc
   r.addChild(cb)
   r.addChild(newLabel(labelStr))
   let p = currentParent()
@@ -59,10 +60,66 @@ template uiSlider*(val: float32 = 0.0, onChangeProc: proc(v: float32) = nil) =
   let p = currentParent()
   if p != nil: p.addChild(s)
 
-template uiTextEdit*(initial: string = "", onChangeProc: proc(t: string) = nil) =
-  let te = newTextEdit(initial)
+template uiProgressBar*(val: float32 = 0.0) =
+  let pb = newProgressBar(val)
+  let p = currentParent()
+  if p != nil: p.addChild(pb)
+
+template uiTabs*(titles: seq[string], onChange: proc(i: int) = nil) =
+  let t = newTabs(titles)
+  t.onTabChanged = onChange
+  let p = currentParent()
+  if p != nil: p.addChild(t)
+
+template uiListView*(items: seq[string]) =
+  let lv = newListView(items)
+  let p = currentParent()
+  if p != nil: p.addChild(lv)
+
+template uiDataGrid*(cols: seq[string], data: seq[seq[string]]) =
+  let dg = newDataGrid(cols, data)
+  let p = currentParent()
+  if p != nil: p.addChild(dg)
+
+template uiTextEdit*(textVal: string = "", onChangeProc: proc(t: string) = nil) =
+  let te = newTextEdit(textVal)
   te.onChanged = onChangeProc
   let p = currentParent()
   if p != nil: p.addChild(te)
 
-# ... and so on for all components
+# Expand to all other components...
+template uiAccordion*(titleStr: string, body: untyped) =
+  let a = Accordion(title: titleStr)
+  a.node = newSvgGroup()
+  let content = newWidget(newSvgGroup())
+  withParent(content):
+    body
+  let ac = newAccordion(titleStr, content)
+  let p = currentParent()
+  if p != nil: p.addChild(ac)
+
+template uiCard*(body: untyped) =
+  let c = newCard()
+  withParent(c):
+    body
+  let p = currentParent()
+  if p != nil: p.addChild(c)
+
+template uiSidebar*(body: untyped) =
+  let s = newSidebar()
+  withParent(s):
+    body
+  let p = currentParent()
+  if p != nil: p.addChild(s)
+
+template uiNavbar*(body: untyped) =
+  let n = newNavbar()
+  withParent(n):
+    body
+  let p = currentParent()
+  if p != nil: p.addChild(n)
+
+template uiRating*(stars: int = 0) =
+  let r = newRating(stars)
+  let p = currentParent()
+  if p != nil: p.addChild(r)
