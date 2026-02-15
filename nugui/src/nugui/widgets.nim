@@ -18,6 +18,8 @@ proc findWidgetByClass*(w: Widget, cls: string): Widget =
 proc newLabel*(text: string): Widget =
   let t = newSvgText(); t.text = text; result = newWidget(t); result.addClass("label")
 
+# --- Interactive ---
+
 type Button* = ref object of Widget
   onClicked*: proc() {.gcsafe.}
 proc newButton*(title: string): Button =
@@ -33,28 +35,19 @@ proc newButton*(title: string): Button =
     else: discard
     return false
 
-type Checkbox* = ref object of Widget
-  checked*: bool
-  onToggled*: proc(c: bool) {.gcsafe.}
-proc initCheckbox(cb: Checkbox, label: string, checked: bool) =
-  cb.checked = checked; let n = cb.findNodeByClass("label"); if n != nil and n of SvgText: SvgText(n).text = label
-  if checked: cb.addClass("checked")
-  cb.onEvent = proc(w: Widget, ev: GuiEvent): bool =
-    let c = Checkbox(w)
-    if ev.kind == evClick: (c.checked = not c.checked; if c.checked: w.addClass("checked") else: w.removeClass("checked"); applyStyles(w); if c.onToggled != nil: c.onToggled(c.checked); return true)
-    return false
-proc newCheckbox*(label: string, checked: bool = false): Checkbox = (result = Checkbox(createWidgetFromTemplate("checkbox")); initCheckbox(result, label, checked))
+type Menu* = ref object of Widget
+proc newMenu*(): Menu =
+    result = Menu(newWidget(newSvgGroup()))
+    result.addClass("menu")
+    result.attributes["layout"] = "flex"
+    result.attributes["flex-direction"] = "column"
+    result.attributes["width"] = "200"
 
-type DataGrid* = ref object of Widget
-proc newDataGrid*(headers: seq[string], data: seq[seq[string]]): DataGrid =
-  result = DataGrid(createWidgetFromTemplate("datagrid"))
-  let hr = result.findWidgetByClass("header-row"); let rows = result.findWidgetByClass("rows")
-  if hr != nil: (for h in headers: hr.addChild(newLabel(h)))
-  if rows != nil:
-    for row in data:
-      let rw = newWidget(); rw.addClass("row"); rw.attributes["layout"] = "flex"; rw.attributes["flex-direction"] = "row"
-      for cell in row: rw.addChild(newLabel(cell))
-      rows.addChild(rw)
+proc addMenuItem*(m: Menu, label: string, onClick: proc() {.gcsafe.}) =
+    let btn = newButton(label)
+    btn.onClicked = onClick
+    btn.addClass("menu-item")
+    m.addChild(btn)
 
 type ComboBox* = ref object of Widget
   options*: seq[string]; index*: int
@@ -62,21 +55,53 @@ proc newComboBox*(options: seq[string]): ComboBox =
   result = ComboBox(createWidgetFromTemplate("combobox")); result.options = options
   let n = result.findNodeByClass("current-text"); if n != nil and n of SvgText and options.len > 0: SvgText(n).text = options[0]
   result.onEvent = proc(w: Widget, ev: GuiEvent): bool =
-    if ev.kind == evClick: (echo "Dropdown menu would open here"); return true
+    if ev.kind == evClick:
+      let cb = ComboBox(w)
+      if w.window != nil:
+        let menu = newMenu()
+        for i, opt in cb.options:
+          let idx = i
+          menu.addMenuItem(opt, proc() =
+            cb.index = idx
+            let txt = cb.findNodeByClass("current-text")
+            if txt != nil and txt of SvgText: SvgText(txt).text = cb.options[idx]
+            w.window.overlays.setLen(0)
+          )
+        menu.computedRect = rect(w.computedRect.x, w.computedRect.y + w.computedRect.h, 200, 200)
+        w.window.overlays.add(menu)
+      return true
     return false
 
-type TextBox* = ref object of Widget
-  editor*: TextEditor
-proc newTextBox*(text: string = ""): TextBox =
-  result = TextBox(createWidgetFromTemplate("textbox")); result.editor = newTextEditor(); result.editor.setText(text)
-  result.onEvent = proc(w: Widget, ev: GuiEvent): bool =
-    let tb = TextBox(w)
-    case ev.kind
-    of evClick: w.window.focusWidget(w); return true
-    of evKeyDown: (if w.window != nil and w.window.focusedWidget == w: (tb.editor.handleKey(ev.key, ev.mods); let n = tb.findNodeByClass("content"); if n != nil and n of SvgText: SvgText(n).text = tb.editor.text; return true))
-    of evTextInput: (if w.window != nil and w.window.focusedWidget == w: (tb.editor.insert(ev.text); let n = tb.findNodeByClass("content"); if n != nil and n of SvgText: SvgText(n).text = tb.editor.text; return true))
-    else: discard
-    return false
+type DataGrid* = ref object of Widget
+proc newDataGrid*(headers: seq[string], data: seq[seq[string]]): DataGrid =
+  result = DataGrid(createWidgetFromTemplate("datagrid"))
+  let hr = result.findWidgetByClass("header-row")
+  let rows = result.findWidgetByClass("rows")
+  if hr != nil:
+    for h in headers:
+      let lbl = newLabel(h); lbl.attributes["width"] = "100"
+      hr.addChild(lbl)
+  if rows != nil:
+    for row in data:
+      let rw = newWidget(); rw.addClass("row"); rw.attributes["layout"] = "flex"; rw.attributes["flex-direction"] = "row"
+      for cell in row:
+        let lbl = newLabel(cell); lbl.attributes["width"] = "100"
+        rw.addChild(lbl)
+      rows.addChild(rw)
+
+type DatePicker* = ref object of Widget
+proc newDatePicker*(): DatePicker =
+  result = DatePicker(createWidgetFromTemplate("datepicker"))
+  let grid = result.findWidgetByClass("grid")
+  if grid != nil:
+    grid.attributes["layout"] = "flex"; grid.attributes["flex-direction"] = "column"
+    for r in 0..4:
+      let row = newWidget(); row.attributes["layout"] = "flex"; row.attributes["flex-direction"] = "row"
+      for c in 1..7:
+        let day = newButton($(r * 7 + c))
+        day.attributes["width"] = "32"; day.attributes["height"] = "32"
+        row.addChild(day)
+      grid.addChild(row)
 
 type Slider* = ref object of Widget
   value*: float32
@@ -92,13 +117,13 @@ proc newSlider*(value: float32 = 0.5): Slider =
     elif ev.kind == evMouseUp: w.removeClass("pressed"); return true
     return false
 
-type Switch* = ref object of Checkbox
-proc newSwitch*(label: string, checked: bool = false): Switch = (result = Switch(createWidgetFromTemplate("checkbox")); initCheckbox(result, label, checked); result.addClass("switch"))
-
-type ProgressBar* = ref object of Widget
-proc newProgressBar*(p: float32 = 0.0): ProgressBar =
-  result = ProgressBar(createWidgetFromTemplate("progressbar"))
-  let f = result.findNodeByClass("fill"); if f != nil and f of SvgRect: SvgRect(f).width = p * 200 # Fixed width base
+type ColorPicker* = ref object of Widget
+proc newColorPicker*(): ColorPicker =
+  result = ColorPicker(createWidgetFromTemplate("color-picker"))
+  # Logic for SV box and Hue slider would go here
+  result.onEvent = proc(w: Widget, ev: GuiEvent): bool =
+    if ev.kind == evMouseDown: return true # Capture
+    return false
 
 type Carousel* = ref object of Widget
   index*: int
@@ -108,6 +133,41 @@ proc newCarousel*(): Carousel =
     if ev.kind == evClick: (let c = Carousel(w); c.index = (c.index + 1) mod 3; return true)
     return false
 
+type Checkbox* = ref object of Widget
+  checked*: bool
+  onToggled*: proc(c: bool) {.gcsafe.}
+proc initCheckbox(cb: Checkbox, label: string, checked: bool) =
+  cb.checked = checked; let n = cb.findNodeByClass("label"); if n != nil and n of SvgText: SvgText(n).text = label
+  if checked: cb.addClass("checked")
+  cb.onEvent = proc(w: Widget, ev: GuiEvent): bool =
+    let c = Checkbox(w)
+    if ev.kind == evClick: (c.checked = not c.checked; if c.checked: w.addClass("checked") else: w.removeClass("checked"); applyStyles(w); if c.onToggled != nil: c.onToggled(c.checked); return true)
+    return false
+proc newCheckbox*(label: string, checked: bool = false): Checkbox = (result = Checkbox(createWidgetFromTemplate("checkbox")); initCheckbox(result, label, checked))
+
+type Switch* = ref object of Checkbox
+proc newSwitch*(label: string, checked: bool = false): Switch = (result = Switch(createWidgetFromTemplate("checkbox")); initCheckbox(result, label, checked); result.addClass("switch"))
+
+type TextBox* = ref object of Widget
+  editor*: TextEditor
+proc newTextBox*(text: string = ""): TextBox =
+  result = TextBox(createWidgetFromTemplate("textbox")); result.editor = newTextEditor(); result.editor.setText(text)
+  result.onEvent = proc(w: Widget, ev: GuiEvent): bool =
+    let tb = TextBox(w)
+    case ev.kind
+    of evClick: w.window.focusWidget(w); return true
+    of evKeyDown: (if w.window != nil and w.window.focusedWidget == w: (tb.editor.handleKey(ev.key, ev.mods); let n = tb.findNodeByClass("content"); if n != nil and n of SvgText: SvgText(n).text = tb.editor.text; return true))
+    of evTextInput: (if w.window != nil and w.window.focusedWidget == w: (tb.editor.insert(ev.text); let n = tb.findNodeByClass("content"); if n != nil and n of SvgText: SvgText(n).text = tb.editor.text; return true))
+    else: discard
+    return false
+
+type ProgressBar* = ref object of Widget
+proc newProgressBar*(p: float32 = 0.0): ProgressBar =
+  result = ProgressBar(createWidgetFromTemplate("progressbar"))
+  let f = result.findNodeByClass("fill"); if f != nil and f of SvgRect: SvgRect(f).width = p * 200
+
+# --- Statics / Simple ---
+
 type PopOver* = ref object of Widget
 proc newPopOver*(): PopOver = result = PopOver(createWidgetFromTemplate("popover"))
 type Radio* = ref object of Widget
@@ -115,14 +175,10 @@ proc newRadio*(label: string, checked: bool = false): Radio =
   result = Radio(createWidgetFromTemplate("radio"))
   let n = result.findNodeByClass("label"); if n != nil and n of SvgText: SvgText(n).text = label
   if checked: result.addClass("checked")
-type DatePicker* = ref object of Widget
-proc newDatePicker*(): DatePicker = result = DatePicker(createWidgetFromTemplate("datepicker"))
 type TreeItem* = ref object of Widget
 proc newTreeItem*(label: string): TreeItem =
   result = TreeItem(createWidgetFromTemplate("tree-item"))
   let n = result.findNodeByClass("label"); if n != nil and n of SvgText: SvgText(n).text = label
-type ColorPicker* = ref object of Widget
-proc newColorPicker*(): ColorPicker = result = ColorPicker(createWidgetFromTemplate("color-picker"))
 type Badge* = ref object of Widget
 proc newBadge*(v: string): Badge =
   result = Badge(createWidgetFromTemplate("badge"))

@@ -69,6 +69,7 @@ type
     modalChild*: Window
     parentWindow*: Window
     texture*: uint32
+    overlays*: seq[Widget]
 
   SvgGui* = ref object
     windows*: seq[Window]
@@ -112,6 +113,12 @@ proc widgetAt*(w: Widget, p: Vec2): Widget =
   if w.contains(p): return w
   return nil
 
+proc findWidgetAt*(win: Window, p: Vec2): Widget =
+  for i in countdown(win.overlays.len - 1, 0):
+    let hit = win.overlays[i].widgetAt(p)
+    if hit != nil: return hit
+  return win.widgetAt(p)
+
 proc dispatchEvent*(gui: SvgGui, w: Widget, event: var GuiEvent): bool =
   if w == nil or not w.enabled: return false
   var curr = w; while curr != nil: (if curr.onEvent != nil: (if curr.onEvent(curr, event): return true); curr = curr.parent)
@@ -122,12 +129,17 @@ proc handleWindyEvent*(gui: SvgGui, win: Window, event: windy.Event) =
   case event.kind
   of ButtonDown:
     guiEv.kind = evMouseDown; guiEv.pos = event.pos; guiEv.button = event.button
-    let hit = win.widgetAt(event.pos); if hit != nil: (gui.setPressed(hit); discard gui.dispatchEvent(hit, guiEv))
+    let hit = win.findWidgetAt(event.pos)
+    if win.overlays.len > 0:
+        var inOverlay = false
+        for o in win.overlays: (if hit != nil and hit.isDescendantOf(o): inOverlay = true; break)
+        if not inOverlay: (win.overlays.setLen(0); return)
+    if hit != nil: (gui.setPressed(hit); discard gui.dispatchEvent(hit, guiEv))
   of ButtonUp:
     guiEv.kind = evMouseUp; guiEv.pos = event.pos; guiEv.button = event.button
     if gui.pressedWidget != nil: (discard gui.dispatchEvent(gui.pressedWidget, guiEv); gui.pressedWidget = nil)
   of MouseMove:
-    guiEv.kind = evMouseMove; guiEv.pos = event.pos; let hit = win.widgetAt(event.pos)
+    guiEv.kind = evMouseMove; guiEv.pos = event.pos; let hit = win.findWidgetAt(event.pos)
     if hit != gui.hoveredWidget:
       if gui.hoveredWidget != nil: (var leaveEv = GuiEvent(kind: evMouseLeave, pos: event.pos); discard gui.dispatchEvent(gui.hoveredWidget, leaveEv))
       gui.hoveredWidget = hit; if hit != nil: (var enterEv = GuiEvent(kind: evMouseEnter, pos: event.pos); discard gui.dispatchEvent(hit, enterEv))

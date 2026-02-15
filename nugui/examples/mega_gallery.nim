@@ -18,14 +18,14 @@ proc main() =
             uiTreeItem "Inputs":
               uiTreeItem "Buttons"
               uiTreeItem "Checkboxes"
-          uiButton "Exit"
+          uiButton "Exit", proc() = quit()
 
       uiScrollArea:
         uiColumn:
           uiRow:
             uiCard "Interactive":
               uiColumn:
-                uiButton "Click Me", proc() = echo "Clicked!"
+                uiButton "Click Me", proc() = echo "Button was clicked!"
                 uiCheckbox "Check Me", true
                 uiSlider 0.75
                 uiSwitch "Toggle", true
@@ -41,24 +41,32 @@ proc main() =
               uiColumn:
                 uiTextBox "Edit Me"
                 uiSearchInput()
-                uiComboBox @["Option 1", "Option 2"]
+                uiComboBox @["Select Language", "Nim", "C++", "Python", "Rust"]
 
-          uiDataGrid(@["ID", "Name"], @[@["1", "Alice"], @["2", "Bob"]])
+          uiDataGrid(@["ID", "Name", "Status"], @[
+            @["1", "Alice", "Online"],
+            @["2", "Bob", "Away"],
+            @["3", "Charlie", "Offline"]
+          ])
+
+          uiRow:
+            uiDatePicker()
+            uiColumn:
+                uiLabel "Pick a color"
+                uiColorPicker()
 
   let w = newWindow("Nugui Mega Gallery", ivec2(1280, 800))
   win.windyWindow = w
   win.winBounds = rect(0, 0, 1280, 800)
   gui.windows.add(win)
 
-  # Hook up events
   w.onEvent = proc(event: Event) =
     gui.handleWindyEvent(win, event)
 
-  loadExtensions() # For OpenGL
+  loadExtensions()
 
-  echo "Ultimate Gallery is live!"
+  echo "Ultimate Gallery is live with functional ComboBox, DataGrid, and more!"
 
   while not w.closeRequested:
     pollEvents()
     gui.updateAndDraw()
-    # sleep(1) # Optional to save CPU

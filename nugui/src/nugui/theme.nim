@@ -61,13 +61,67 @@ const defaultThemeSVG* = """
   <g id="carousel" class="carousel" layout="box">
     <rect class="bg" box-anchor="fill" fill="var(--base)"/>
     <g class="items" layout="flex" flex-direction="row"></g>
-    <use xlink:href="#icon-chevron-left" box-anchor="left" margin="0 8"/>
-    <use xlink:href="#icon-chevron-right" box-anchor="right" margin="0 8"/>
+    <use xlink:href="#icon-chevron-left" box-anchor="left" margin="0 8" fill="white"/>
+    <use xlink:href="#icon-chevron-right" box-anchor="right" margin="0 8" fill="white"/>
   </g>
 
-  <g id="popover" class="popover" layout="box">
-    <rect class="bg" box-anchor="fill" rx="4" fill="var(--window)" filter="drop-shadow(0 4px 8px rgba(0,0,0,0.2))"/>
-    <g class="content" margin="12"></g>
+  <g id="datepicker" class="datepicker" layout="flex" flex-direction="column" width="250">
+    <rect class="bg" box-anchor="fill" rx="4" fill="var(--window)" stroke="var(--light)"/>
+    <g class="header" layout="box" height="40">
+        <use xlink:href="#icon-chevron-left" box-anchor="left" margin="0 8" fill="var(--icon)"/>
+        <text class="month-year" box-anchor="center" fill="var(--text)">October 2023</text>
+        <use xlink:href="#icon-chevron-right" box-anchor="right" margin="0 8" fill="var(--icon)"/>
+    </g>
+    <g class="grid" layout="flex" flex-direction="column" margin="8"></g>
+  </g>
+
+  <g id="color-picker" class="color-picker" layout="flex" flex-direction="column" width="200">
+    <rect class="sv-box" width="200" height="150" fill="red"/>
+    <rect class="hue-slider" margin="8 0" width="200" height="20" fill="var(--light)"/>
+  </g>
+
+  <g id="tree-item" class="tree-item" layout="flex" flex-direction="column">
+    <g class="header" layout="flex" flex-direction="row" height="32">
+        <use xlink:href="#icon-chevron-right" margin="0 4" fill="var(--icon)"/>
+        <text class="label" fill="var(--text)">Node</text>
+    </g>
+  </g>
+
+  <g id="badge" class="badge" layout="box">
+    <rect class="bg" box-anchor="fill" rx="10" fill="var(--title)"/>
+    <text class="label" margin="2 8" font-size="12" fill="white">0</text>
+  </g>
+
+  <g id="avatar" class="avatar">
+    <circle cx="20" cy="20" r="20" fill="var(--light)"/>
+    <text class="initials" x="20" y="24" text-anchor="middle" fill="white" font-size="16">JD</text>
+  </g>
+
+  <g id="progressbar" class="progressbar" layout="box" box-anchor="hfill">
+    <rect class="background" box-anchor="fill" width="200" height="12" rx="6" fill="var(--base)"/>
+    <rect class="fill" box-anchor="left vfill" width="0" height="12" rx="6" fill="var(--title)"/>
+  </g>
+
+  <g id="spinner" class="spinner" width="24" height="24">
+    <circle cx="12" cy="12" r="10" fill="none" stroke="var(--light)" stroke-width="3"/>
+    <path d="M12 2a10 10 0 0 1 10 10" fill="none" stroke="var(--title)" stroke-width="3"/>
+  </g>
+
+  <g id="navbar" class="navbar" layout="box" height="64" box-anchor="hfill">
+    <rect class="bg" box-anchor="fill" fill="var(--dark)"/>
+    <text class="logo" box-anchor="left" margin="0 24" font-weight="bold" fill="var(--title)">NUGUI</text>
+  </g>
+
+  <g id="sidebar" class="sidebar" layout="flex" flex-direction="column" width="240" box-anchor="vfill">
+    <rect class="bg" box-anchor="fill" fill="var(--base)"/>
+  </g>
+
+  <g id="divider" class="divider" layout="box" box-anchor="hfill" height="1">
+    <rect box-anchor="fill" fill="var(--light)"/>
+  </g>
+
+  <g id="scrollarea" class="scrollarea" layout="box">
+    <g class="viewport" box-anchor="fill" layout="box"></g>
   </g>
 </svg>
 """
@@ -91,6 +145,7 @@ proc initDefaultTheme*() =
   styleRules.add StyleRule(selector: @[".pushbutton.pressed"], props: {"fill": "var(--pressed)"}.toTable)
   styleRules.add StyleRule(selector: @[".pushbutton.hovered"], props: {"fill": "var(--hovered)"}.toTable)
   styleRules.add StyleRule(selector: @[".checkbox.checked .checkmark"], props: {"visibility": "visible"}.toTable)
+  styleRules.add StyleRule(selector: @[".switch.checked .checkmark"], props: {"visibility": "visible"}.toTable)
 
 proc resolveVar(val: string): string =
   if val.startsWith("var("): themeVars.getOrDefault(val[4..^2], val) else: val
@@ -123,6 +178,7 @@ proc deepClone*(n: SvgNode): SvgNode =
   elif n of SvgGroup: (let g = SvgGroup(n); let res = newSvgGroup(); res.metadata = g.metadata; for child in g.children: res.children.add(deepClone(child)); return res)
   elif n of SvgUse: (let u = SvgUse(n); let res = newSvgUse(); res.x = u.x; res.y = u.y; res.width = u.width; res.height = u.height; res.href = u.href; res.metadata = u.metadata; return res)
   elif n of SvgCircle: (let c = SvgCircle(n); let res = newSvgCircle(); res.cx = c.cx; res.cy = c.cy; res.r = c.r; res.metadata = c.metadata; return res)
+  elif n of SvgPath: (let p = SvgPath(n); let res = newSvgPath(); res.d = p.d; res.metadata = p.metadata; return res)
   return newSvgGroup()
 
 proc findNodeById*(root: SvgNode, id: string): SvgNode =
