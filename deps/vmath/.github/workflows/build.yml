@@ -1,0 +1,26 @@
+name: Github Actions
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        nim-version: ['1.4.0', '2.0.0', '2.2.4']
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v5
+    - uses: treeform/setup-nim-action@v2
+      with:
+        nim-version: ${{ matrix.nim-version }}
+    - run: nimble test -y
+    - run: nimble test --gc:orc -y
+    - run: nimble test -y -d:vmathObjBased
+    - run: nimble test -y -d:vmathArrayBased
+    - run: nim js -r tests/test.nim
