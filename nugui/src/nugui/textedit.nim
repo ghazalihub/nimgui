@@ -1,106 +1,73 @@
-import core, pixie, vmath, unicode, layout, strutils, theme
+import core, pixie, vmath, unicode, strutils
 
 type
-  TextEdit* = ref object of Widget
+  TextEditor* = ref object
     text*: string
     cursorPos*: int # Rune index
-    selectionStart*: int # Rune index, -1 if no selection
-    selectionEnd*: int
-    onChanged*: proc(text: string) {.gcsafe.}
+    selectionStart*: int
     undoStack*: seq[string]
     redoStack*: seq[string]
-    cursorWidget*: Widget
-    selectionWidget*: Widget
 
-proc runes(te: TextEdit): seq[Rune] =
+proc runes*(te: TextEditor): seq[Rune] =
   te.text.toRunes()
 
-proc updateNodeText(te: TextEdit) =
-  if te.node != nil and te.node of SvgText:
-    SvgText(te.node).text = te.text
-  # Update cursor pos (mock for now, need font metrics)
-  if te.cursorWidget != nil:
-    te.cursorWidget.computedRect.x = te.cursorPos.float32 * 8.0f # Mock spacing
+proc setText*(te: TextEditor, s: string) =
+  te.text = s
+  te.cursorPos = s.toRunes().len
 
-proc saveUndo*(te: TextEdit) =
+proc insert*(te: TextEditor, s: string) =
   te.undoStack.add(te.text)
   te.redoStack.setLen(0)
-
-proc undo*(te: TextEdit) =
-  if te.undoStack.len > 0:
-    te.redoStack.add(te.text)
-    te.text = te.undoStack.pop()
-    te.updateNodeText()
-
-proc newTextEdit*(text: string = ""): TextEdit =
-  result = TextEdit(text: text, cursorPos: text.toRunes().len, selectionStart: -1)
-  result.node = newSvgText()
-  result.updateNodeText()
-  result.enabled = true
-  result.visible = true
-  result.isFocusable = true
-  result.addClass("textedit")
-
-  # Selection background
-  result.selectionWidget = newWidget(newSvgRect())
-  result.selectionWidget.addClass("text-selection")
-  result.selectionWidget.visible = false
-  result.addChild(result.selectionWidget)
-
-  # Cursor
-  result.cursorWidget = newWidget(newSvgRect())
-  result.cursorWidget.addClass("text-cursor")
-  result.addChild(result.cursorWidget)
-
-  result.onEvent = proc(w: Widget, ev: GuiEvent): bool =
-    let te = TextEdit(w)
-    case ev.kind
-    of evKeyDown:
-      let runes = te.runes()
-      case ev.keyCode
-      of KeyLeft:
-        if te.cursorPos > 0: te.cursorPos -= 1
-        te.updateNodeText()
-        return true
-      of KeyRight:
-        if te.cursorPos < runes.len: te.cursorPos += 1
-        te.updateNodeText()
-        return true
-      of KeyBackspace:
-        if te.cursorPos > 0:
-          te.saveUndo()
-          var r = runes
-          r.delete(te.cursorPos - 1)
-          te.text = r.string
-          te.cursorPos -= 1
-          te.updateNodeText()
-          if te.onChanged != nil: te.onChanged(te.text)
-        return true
-      of KeyDelete:
-        if te.cursorPos < runes.len:
-          te.saveUndo()
-          var r = runes
-          r.delete(te.cursorPos)
-          te.text = r.string
-          te.updateNodeText()
-          if te.onChanged != nil: te.onChanged(te.text)
-        return true
-      of KeyZ:
-        # Check Ctrl
-        te.undo()
-        return true
-      else: discard
-    of evClick:
-      w.gui.setFocused(w, ReasonPressed)
-      return true
-    else: discard
-    return false
-
-proc insertChar*(te: TextEdit, c: Rune) =
-  te.saveUndo()
   var r = te.runes()
-  r.insert(c, te.cursorPos)
+  let ins = s.toRunes()
+  for i, rune in ins:
+    r.insert(rune, te.cursorPos + i)
   te.text = r.string
-  te.cursorPos += 1
-  te.updateNodeText()
-  if te.onChanged != nil: te.onChanged(te.text)
+  te.cursorPos += ins.len
+
+proc backspace*(te: TextEditor) =
+  if te.cursorPos > 0:
+    te.undoStack.add(te.text)
+    var r = te.runes()
+    r.delete(te.cursorPos - 1)
+    te.text = r.string
+    te.cursorPos -= 1
+
+proc delete*(te: TextEditor) =
+  var r = te.runes()
+  if te.cursorPos < r.len:
+    te.undoStack.add(te.text)
+    r.delete(te.cursorPos)
+    te.text = r.string
+
+proc handleKey*(te: TextEditor, key: Key, mods: set[Modifier]) =
+  case key
+  of KeyLeft:
+    if te.cursorPos > 0: te.cursorPos -= 1
+  of KeyRight:
+    var r = te.runes()
+    if te.cursorPos < r.len: te.cursorPos += 1
+  of KeyBackspace:
+    te.backspace()
+  of KeyDelete:
+    te.delete()
+  of KeyHome:
+    te.cursorPos = 0
+  of KeyEnd:
+    te.cursorPos = te.runes().len
+  of KeyZ:
+    if mCtrl in mods:
+        if te.undoStack.len > 0:
+            te.redoStack.add(te.text)
+            te.text = te.undoStack.pop()
+            te.cursorPos = te.text.toRunes().len
+  of KeyY:
+    if mCtrl in mods:
+        if te.redoStack.len > 0:
+            te.undoStack.add(te.text)
+            te.text = te.redoStack.pop()
+            te.cursorPos = te.text.toRunes().len
+  else: discard
+
+proc newTextEditor*(): TextEditor =
+  result = TextEditor(text: "", cursorPos: 0, selectionStart: -1)

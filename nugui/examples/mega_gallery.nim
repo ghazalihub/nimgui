@@ -1,55 +1,64 @@
-import nugui/core, nugui/widgets, nugui/textedit, nugui/dsl, nugui/renderer, nugui/theme, windy, pixie, vmath
+import nugui/core, nugui/widgets, nugui/textedit, nugui/dsl, nugui/renderer, nugui/theme, windy, pixie, vmath, opengl
 
 proc main() =
   let gui = newSvgGui()
   initDefaultTheme()
 
-  # Building a complex UI declaratively
-  let win = uiWindow "Nugui Mega Gallery":
-    uiNavbar:
+  let win = uiWindow "Nugui Ultimate Mega Gallery":
+    uiNavbar "NUGUI":
       uiRow:
-        uiLabel "NUGUI PLATFORM"
         uiButton "Home"
-        uiButton "Docs"
+        uiButton "Components"
+        uiAvatar "JS"
 
     uiRow:
       uiSidebar:
         uiColumn:
-          uiButton "Inbox"
-          uiButton "Sent"
-          uiButton "Archive"
+          uiTreeView:
+            uiTreeItem "Inputs":
+              uiTreeItem "Buttons"
+              uiTreeItem "Checkboxes"
+          uiButton "Exit"
 
-      uiColumn:
-        uiCard:
-          uiColumn:
-            uiLabel "User Profile"
-            uiRow:
-              uiLabel "Name:"
-              uiTextEdit "Jules"
-            uiCheckbox "Public Profile", true
-            uiRow:
-              uiButton "Save", proc() = echo "Saved!"
+      uiScrollArea:
+        uiColumn:
+          uiRow:
+            uiCard "Interactive":
+              uiColumn:
+                uiButton "Click Me", proc() = echo "Clicked!"
+                uiCheckbox "Check Me", true
+                uiSlider 0.75
+                uiSwitch "Toggle", true
 
-        uiCard:
-          uiColumn:
-            uiLabel "System Stats"
-            uiProgressBar 0.8
-            uiSlider 0.5
-            uiTabs @["CPU", "Disk"]
-            uiDataGrid(@["Metric", "Value"], @[@["Up", "24d"], @["Users", "1.2k"]])
+            uiCard "Status":
+              uiColumn:
+                uiBadge "New"
+                uiProgressBar 0.45
+                uiSpinner()
 
-  # Windy window setup
-  let w = newWindow("Mega Gallery", ivec2(1024, 768))
+          uiRow:
+            uiCard "Forms":
+              uiColumn:
+                uiTextBox "Edit Me"
+                uiSearchInput()
+                uiComboBox @["Option 1", "Option 2"]
+
+          uiDataGrid(@["ID", "Name"], @[@["1", "Alice"], @["2", "Bob"]])
+
+  let w = newWindow("Nugui Mega Gallery", ivec2(1280, 800))
   win.windyWindow = w
-  win.winBounds = rect(0, 0, 1024, 768)
+  win.winBounds = rect(0, 0, 1280, 800)
   gui.windows.add(win)
 
-  echo "Mega Gallery is running with 46 functional widgets!"
+  # Hook up events
+  w.onEvent = proc(event: Event) =
+    gui.handleWindyEvent(win, event)
+
+  loadExtensions() # For OpenGL
+
+  echo "Ultimate Gallery is live!"
 
   while not w.closeRequested:
-    gui.updateAndDraw()
-    w.swapBuffers()
     pollEvents()
-
-if isMainModule:
-  main()
+    gui.updateAndDraw()
+    # sleep(1) # Optional to save CPU

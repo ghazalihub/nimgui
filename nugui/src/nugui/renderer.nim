@@ -1,35 +1,40 @@
-import pixie, figdraw, figdraw/fignodes, figdraw/commons, chroma, vmath, core, layout, theme, tables, strutils
+import pixie, opengl, windy, vmath, core, layout, theme, tables, strutils
 
-proc renderWindow*(win: Window): Image =
-  # Properly render the window using Pixie
+proc renderToImage*(win: Window): Image =
   result = newImage(win.winBounds.w.int, win.winBounds.h.int)
-  result.fill(rgba(48, 48, 48, 255))
-
-  # Recursively draw the SVG tree starting from the window node
-  # Pixie's draw(Image, SvgNode) handles the heavy lifting
+  result.fill(rgba(30, 30, 30, 255))
   result.draw(win.node)
+
+proc updateTexture*(win: Window, img: Image) =
+  if win.texture == 0: glGenTextures(1, addr win.texture)
+  glBindTexture(GL_TEXTURE_2D, win.texture)
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8.GLint, img.width.GLsizei, img.height.GLsizei, 0, GL_RGBA, GL_UNSIGNED_BYTE, addr img.data[0])
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR.GLint)
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR.GLint)
+
+proc drawTexture*(win: Window) =
+  glEnable(GL_TEXTURE_2D)
+  glBindTexture(GL_TEXTURE_2D, win.texture)
+  glBegin(GL_QUADS)
+  glTexCoord2f(0, 1); glVertex2f(-1, -1)
+  glTexCoord2f(1, 1); glVertex2f(1, -1)
+  glTexCoord2f(1, 0); glVertex2f(1, 1)
+  glTexCoord2f(0, 0); glVertex2f(-1, 1)
+  glEnd()
 
 proc updateAndDraw*(gui: SvgGui) =
   gui.processTimers()
   gui.layoutCtx.resetContext()
   for win in gui.windows:
-    # 1. Prepare Layout tree
+    if win.windyWindow == nil: continue
+    win.windyWindow.makeContextCurrent()
     let rootId = gui.layoutCtx.prepareLayout(win)
-
-    # 2. Set root size
-    gui.layoutCtx.setSize(rootId, [win.winBounds.w, win.winBounds.h])
-
-    # 3. Run Layout calculation
+    gui.layoutCtx.setSize(rootId, [win.windyWindow.size.x.float32, win.windyWindow.size.y.float32])
     gui.layoutCtx.runContext()
-
-    # 4. Apply calculated rects back to widgets and their SVG nodes
     gui.layoutCtx.applyLayout(win)
-
-    # 5. Apply CSS styles based on new states/classes
     applyStyles(win)
-
-    # 6. Render to window buffer
-    let img = renderWindow(win)
-    # The application main loop would then copy this 'img' to the Windy window
-    # e.g. win.windyWindow.onFrame = proc() = ...
-    discard
+    let img = renderToImage(win)
+    win.updateTexture(img)
+    glClear(GL_COLOR_BUFFER_BIT)
+    win.drawTexture()
+    win.windyWindow.swapBuffers()

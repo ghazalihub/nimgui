@@ -1,0 +1,12 @@
+version       = "0.1.0"
+author        = "Jules"
+description   = "SVG-based UI library for Nim"
+license       = "MIT"
+srcDir        = "src"
+
+requires "nim >= 1.6.0"
+requires "windy"
+requires "pixie"
+requires "vmath"
+requires "chroma"
+requires "figdraw"
