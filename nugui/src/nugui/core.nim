@@ -312,17 +312,15 @@ proc processTimers*(gui: SvgGui) =
         gui.timers[i].nextTick = now + period.float / 1000.0
     i += 1
 
-proc setTimer*(gui: SvgGui, msec: int, widget: Widget, callback: TimerCallback = nil): ptr Timer =
+proc setTimer*(gui: SvgGui, msec: int, widget: Widget, callback: TimerCallback = nil): int =
   var t = Timer(period: msec, widget: widget, callback: callback)
   t.nextTick = epochTime() + msec.float / 1000.0
   gui.timers.add(t)
-  return addr gui.timers[^1]
+  return gui.timers.len - 1
 
-proc removeTimer*(gui: SvgGui, timer: ptr Timer) =
-  for i in 0 ..< gui.timers.len:
-    if addr gui.timers[i] == timer:
-      gui.timers.delete(i)
-      break
+proc removeTimer*(gui: SvgGui, timerIdx: int) =
+  if timerIdx >= 0 and timerIdx < gui.timers.len:
+    gui.timers.delete(timerIdx)
 
 proc removeTimers*(gui: SvgGui, widget: Widget) =
   var i = 0
@@ -430,9 +428,24 @@ proc applyLayout*(ctx: var LayContext, w: Widget) =
     let r = ctx.getRect(w.layoutId)
     let dest = rect(r[0], r[1], r[2], r[3])
     let src = w.computedRect
+
     if w.onApplyLayout != nil:
       discard w.onApplyLayout(w, src, dest)
+
     w.computedRect = dest
+
+    # Apply layout results to SVG nodes
+    if w.node of SvgRect:
+      let node = SvgRect(w.node)
+      node.x = dest.x
+      node.y = dest.y
+      node.width = dest.w
+      node.height = dest.h
+    elif w.node of SvgText:
+      let node = SvgText(w.node)
+      node.x = dest.x
+      node.y = dest.y + dest.h * 0.7 # Simple baseline adjustment
+    # Groups handle positioning through parent transformations or recursion
 
   for child in w.children:
     ctx.applyLayout(child)

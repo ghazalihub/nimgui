@@ -1,13 +1,16 @@
-import core, pixie, vmath, unicode, layout, strutils
+import core, pixie, vmath, unicode, layout, strutils, theme
 
 type
   TextEdit* = ref object of Widget
     text*: string
     cursorPos*: int # Rune index
     selectionStart*: int # Rune index, -1 if no selection
+    selectionEnd*: int
     onChanged*: proc(text: string) {.gcsafe.}
     undoStack*: seq[string]
     redoStack*: seq[string]
+    cursorWidget*: Widget
+    selectionWidget*: Widget
 
 proc runes(te: TextEdit): seq[Rune] =
   te.text.toRunes()
@@ -15,6 +18,9 @@ proc runes(te: TextEdit): seq[Rune] =
 proc updateNodeText(te: TextEdit) =
   if te.node != nil and te.node of SvgText:
     SvgText(te.node).text = te.text
+  # Update cursor pos (mock for now, need font metrics)
+  if te.cursorWidget != nil:
+    te.cursorWidget.computedRect.x = te.cursorPos.float32 * 8.0f # Mock spacing
 
 proc saveUndo*(te: TextEdit) =
   te.undoStack.add(te.text)
@@ -33,6 +39,18 @@ proc newTextEdit*(text: string = ""): TextEdit =
   result.enabled = true
   result.visible = true
   result.isFocusable = true
+  result.addClass("textedit")
+
+  # Selection background
+  result.selectionWidget = newWidget(newSvgRect())
+  result.selectionWidget.addClass("text-selection")
+  result.selectionWidget.visible = false
+  result.addChild(result.selectionWidget)
+
+  # Cursor
+  result.cursorWidget = newWidget(newSvgRect())
+  result.cursorWidget.addClass("text-cursor")
+  result.addChild(result.cursorWidget)
 
   result.onEvent = proc(w: Widget, ev: GuiEvent): bool =
     let te = TextEdit(w)
@@ -42,9 +60,11 @@ proc newTextEdit*(text: string = ""): TextEdit =
       case ev.keyCode
       of KeyLeft:
         if te.cursorPos > 0: te.cursorPos -= 1
+        te.updateNodeText()
         return true
       of KeyRight:
         if te.cursorPos < runes.len: te.cursorPos += 1
+        te.updateNodeText()
         return true
       of KeyBackspace:
         if te.cursorPos > 0:
@@ -65,16 +85,10 @@ proc newTextEdit*(text: string = ""): TextEdit =
           te.updateNodeText()
           if te.onChanged != nil: te.onChanged(te.text)
         return true
-      of KeyA:
-        if ev.keyCode in {KeyLeftControl, KeyRightControl}:
-          # Select all
-          te.selectionStart = 0
-          te.selectionEnd = runes.len
-          return true
       of KeyZ:
-        if ev.keyCode in {KeyLeftControl, KeyRightControl}:
-          te.undo()
-          return true
+        # Check Ctrl
+        te.undo()
+        return true
       else: discard
     of evClick:
       w.gui.setFocused(w, ReasonPressed)

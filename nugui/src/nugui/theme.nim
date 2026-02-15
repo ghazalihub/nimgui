@@ -14,121 +14,73 @@ const defaultThemeSVG* = """
     </svg>
   </defs>
 
-  <g id="menu" class="menu" display="none">
-    <rect class="background menu-bg" box-anchor="fill" width="20" height="20"/>
-    <g class="child-container" box-anchor="fill" layout="flex" flex-direction="column"></g>
-  </g>
-
   <g id="pushbutton" class="pushbutton" layout="box">
-    <rect class="background pushbtn-bg" box-anchor="fill" width="36" height="36" rx="4"/>
+    <rect class="background" box-anchor="fill" width="36" height="36" rx="4"/>
     <text class="title" margin="8 8">Button</text>
-  </g>
-
-  <g id="checkbox" class="checkbox" layout="box">
-    <rect class="background" width="26" height="26" fill="none"/>
-    <rect class="box" x="4" y="4" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"/>
-    <g class="checkmark" visibility="hidden">
-      <rect x="3.25" y="3.25" width="19.5" height="19.5" fill="currentColor"/>
-      <path d="M7 13 L11 17 L19 9" stroke="white" stroke-width="2" fill="none"/>
-    </g>
-  </g>
-
-  <g id="slider" class="slider" box-anchor="hfill" layout="box">
-    <rect class="track" box-anchor="hfill" width="200" height="4" y="11" fill="#505050"/>
-    <g class="handle-container" box-anchor="left">
-        <rect class="handle" width="20" height="26" fill="#CDCDCD" rx="2"/>
-    </g>
-  </g>
-
-  <g id="progressbar" class="progressbar" box-anchor="hfill" layout="box">
-    <rect class="background" box-anchor="fill" width="200" height="12" fill="#202020"/>
-    <rect class="fill" box-anchor="left vfill" width="0" height="12" fill="#32809C"/>
-  </g>
-
-  <g id="textbox" class="textbox" box-anchor="fill" layout="box">
-    <rect class="background" box-anchor="fill" width="150" height="36" fill="#202020" stroke="#555555" stroke-width="1"/>
-    <text class="content" box-anchor="left" margin="4 8"></text>
   </g>
 </svg>
 """
 
 type
   StyleRule* = object
-    selector*: string
+    selector*: seq[string]
     props*: Table[string, string]
 
-var currentThemeSVG*: SvgDocument
 var styleRules*: seq[StyleRule] = @[]
+var themeVars*: Table[string, string] = initTable[string, string]()
 
 proc initDefaultTheme*() =
-  currentThemeSVG = parseSvg(defaultThemeSVG)
-  # Basic rules
-  styleRules.add StyleRule(selector: ".pushbutton", props: {"fill": "#555555"}.toTable)
-  styleRules.add StyleRule(selector: ".pushbutton.hovered", props: {"fill": "#4290AC"}.toTable)
-  styleRules.add StyleRule(selector: ".pushbutton.pressed", props: {"fill": "#32809C"}.toTable)
-  styleRules.add StyleRule(selector: ".checkbox .box", props: {"stroke": "#CDCDCD"}.toTable)
-  styleRules.add StyleRule(selector: ".checkbox.checked .checkmark", props: {"visibility": "visible"}.toTable)
+  themeVars["--button"] = "#555555"
+  themeVars["--hovered"] = "#4290AC"
+  themeVars["--pressed"] = "#32809C"
+  styleRules.add StyleRule(selector: @[".pushbutton"], props: {"fill": "var(--button)"}.toTable)
+  styleRules.add StyleRule(selector: @[".pushbutton.hovered"], props: {"fill": "var(--hovered)"}.toTable)
+  styleRules.add StyleRule(selector: @[".pushbutton.pressed"], props: {"fill": "var(--pressed)"}.toTable)
 
-proc findNodeById*(root: SvgNode, id: string): SvgNode =
-  if root.metadata.getOrDefault("id", "") == id: return root
-  if root of SvgGroup:
-    for child in SvgGroup(root).children:
-      let found = findNodeById(child, id)
-      if found != nil: return found
-  return nil
+proc resolveVar(val: string): string =
+  if val.startsWith("var("):
+    let v = val[4..^2]
+    return themeVars.getOrDefault(v, val)
+  return val
 
-proc deepClone*(n: SvgNode): SvgNode =
-  # Porting basic deep clone for pixie nodes
-  if n of SvgRect:
-    let r = SvgRect(n)
-    let res = newSvgRect()
-    res.x = r.x; res.y = r.y; res.width = r.width; res.height = r.height
-    res.rx = r.rx; res.ry = r.ry; res.metadata = r.metadata
-    return res
-  elif n of SvgText:
-    let t = SvgText(n)
-    let res = newSvgText()
-    res.text = t.text; res.metadata = t.metadata
-    return res
-  elif n of SvgGroup:
-    let g = SvgGroup(n)
-    let res = newSvgGroup()
-    res.metadata = g.metadata
-    for child in g.children:
-      res.children.add(deepClone(child))
-    return res
-  elif n of SvgPath:
-    let p = SvgPath(n)
-    let res = newSvgPath()
-    res.d = p.d; res.metadata = p.metadata
-    return res
-  return newSvgGroup()
+proc matchesSelector(w: Widget, selectorPart: string): bool =
+  let classes = selectorPart.split('.')
+  for c in classes:
+    if c == "": continue
+    if c not in w.classes: return false
+  return true
 
-proc createWidgetFromTemplate*(id: string): Widget =
-  if currentThemeSVG == nil: initDefaultTheme()
-  let tpl = findNodeById(currentThemeSVG, id)
-  if tpl == nil:
-    return newWidget(newSvgGroup())
-  let node = deepClone(tpl)
-  result = newWidget(node)
-  # Extract initial classes from template
-  let cls = tpl.metadata.getOrDefault("class", "")
-  if cls != "":
-    for c in cls.splitWhitespace():
-      result.classes.incl(c)
-
-proc applyStyles*(w: Widget) =
-  # Simple rule matcher: .class or .class.state
+proc applyStylesRec(w: Widget, ancestors: var seq[Widget]) =
   for rule in styleRules:
-    let parts = rule.selector.split('.')
-    if parts.len < 2: continue
+    if rule.selector.len == 0: continue
+    if matchesSelector(w, rule.selector[^1]):
+      var match = true
+      if rule.selector.len > 1:
+        var ai = ancestors.len - 1
+        for i in countdown(rule.selector.len - 2, 0):
+          let target = rule.selector[i]
+          var found = false
+          while ai >= 0:
+            if matchesSelector(ancestors[ai], target):
+              found = true; ai -= 1; break
+            ai -= 1
+          if not found: match = false; break
+      if match:
+        for k, v in rule.props: w.attributes[k] = resolveVar(v)
+  ancestors.add w
+  for child in w.children: applyStylesRec(child, ancestors)
+  discard ancestors.pop()
 
-    var matches = true
-    for i in 1 ..< parts.len:
-      if parts[i] not in w.classes:
-        matches = false
-        break
+proc applyStyles*(root: Widget) =
+  var ancestors: seq[Widget] = @[]
+  applyStylesRec(root, ancestors)
 
-    if matches:
-      for k, v in rule.props:
-        w.attributes[k] = v
+proc parseColor*(s: string): chroma.Color =
+  if s.startsWith("#"):
+    let hex = s.strip(chars = {'#'})
+    if hex.len == 6:
+      let r = fromHex[uint8](hex[0..1])
+      let g = fromHex[uint8](hex[2..3])
+      let b = fromHex[uint8](hex[4..5])
+      return chroma.rgba(r, g, b, 255).color
+  return chroma.rgba(200, 200, 200, 255).color

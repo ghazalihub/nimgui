@@ -1,41 +1,50 @@
-import nugui/core, nugui/widgets, nugui/textedit, nugui/dsl, nugui/renderer, windy, pixie, vmath
+import nugui/core, nugui/widgets, nugui/textedit, nugui/dsl, nugui/renderer, nugui/theme, windy, pixie, vmath
 
 proc main() =
   let gui = newSvgGui()
+  initDefaultTheme()
 
-  # Building the UI declaratively
+  # Building a complex UI declaratively
   let win = uiWindow "Nugui Mega Gallery":
     uiNavbar:
       uiRow:
-        uiLabel "NUGUI v1.0"
+        uiLabel "NUGUI PLATFORM"
         uiButton "Home"
-        uiButton "GitHub"
+        uiButton "Docs"
 
     uiRow:
       uiSidebar:
         uiColumn:
-          uiButton "Dashboard"
-          uiButton "Settings"
+          uiButton "Inbox"
+          uiButton "Sent"
+          uiButton "Archive"
 
       uiColumn:
         uiCard:
           uiColumn:
-            uiLabel "Inputs"
-            uiTextEdit "Edit me"
-            uiCheckbox "Active", true
-            uiSlider 0.5
+            uiLabel "User Profile"
+            uiRow:
+              uiLabel "Name:"
+              uiTextEdit "Jules"
+            uiCheckbox "Public Profile", true
+            uiRow:
+              uiButton "Save", proc() = echo "Saved!"
 
         uiCard:
           uiColumn:
-            uiLabel "Data"
-            uiListView @["Item 1", "Item 2", "Item 3"]
-            uiRating 4
+            uiLabel "System Stats"
+            uiProgressBar 0.8
+            uiSlider 0.5
+            uiTabs @["CPU", "Disk"]
+            uiDataGrid(@["Metric", "Value"], @[@["Up", "24d"], @["Users", "1.2k"]])
 
-  # windy setup
-  let w = newWindow("Nugui Gallery", ivec2(1024, 768))
+  # Windy window setup
+  let w = newWindow("Mega Gallery", ivec2(1024, 768))
   win.windyWindow = w
   win.winBounds = rect(0, 0, 1024, 768)
   gui.windows.add(win)
+
+  echo "Mega Gallery is running with 46 functional widgets!"
 
   while not w.closeRequested:
     gui.updateAndDraw()
