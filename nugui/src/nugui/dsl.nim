@@ -12,8 +12,7 @@ proc currentParent(): Widget =
   if parentStack.len > 0: parentStack[^1] else: nil
 
 template uiWindow*(titleStr: string, body: untyped): Window =
-  let win = Window(visible: true, children: @[], node: newSvgGroup())
-  # Properly initialize window with gui etc. in real use
+  let win = Window(visible: true, children: @[], node: newSvgGroup(), title: titleStr)
   withParent(win):
     body
   win
@@ -34,35 +33,36 @@ template uiRow*(body: untyped) =
   withParent(g):
     body
 
-template uiButton*(titleStr: string, onClickedBody: untyped = nil) =
+template uiButton*(titleStr: string, onClickedProc: proc() = nil) =
   let b = newButton(titleStr)
+  b.onClicked = onClickedProc
   let p = currentParent()
   if p != nil: p.addChild(b)
-  # Handle onClickedBody if needed
 
 template uiLabel*(textStr: string) =
   let l = newLabel(textStr)
   let p = currentParent()
   if p != nil: p.addChild(l)
 
-template uiCheckbox*(checkedVal: bool = false) =
+template uiCheckbox*(labelStr: string, checkedVal: bool = false) =
+  let r = newWidget(newSvgGroup())
+  r.layContain = uint32(LAY_ROW) or uint32(LAY_FLEX)
   let cb = newCheckbox(checkedVal)
+  r.addChild(cb)
+  r.addChild(newLabel(labelStr))
   let p = currentParent()
-  if p != nil: p.addChild(cb)
+  if p != nil: p.addChild(r)
 
-template uiSlider*(val: float32 = 0.0) =
+template uiSlider*(val: float32 = 0.0, onChangeProc: proc(v: float32) = nil) =
   let s = newSlider(val)
+  s.onChanged = onChangeProc
   let p = currentParent()
   if p != nil: p.addChild(s)
 
-template uiProgressBar*(val: float32 = 0.0) =
-  let pb = newProgressBar(val)
+template uiTextEdit*(initial: string = "", onChangeProc: proc(t: string) = nil) =
+  let te = newTextEdit(initial)
+  te.onChanged = onChangeProc
   let p = currentParent()
-  if p != nil: p.addChild(pb)
+  if p != nil: p.addChild(te)
 
-template uiTabs*(titles: seq[string]) =
-  let t = newTabs(titles)
-  let p = currentParent()
-  if p != nil: p.addChild(t)
-
-# ... add more for all 30+ widgets as needed
+# ... and so on for all components

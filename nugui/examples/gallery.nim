@@ -6,24 +6,36 @@ proc main() =
   let win = uiWindow "Nugui Component Gallery":
     uiColumn:
       uiRow:
-        uiLabel "Buttons & Inputs:"
-        uiButton "Primary"
-        uiButton "Secondary"
-        uiCheckbox true
-        uiToggle true
+        uiLabel "Buttons:"
+        uiButton "Primary Action", proc() = echo "Clicked Primary!"
+        uiButton "Secondary", proc() = echo "Clicked Secondary!"
 
       uiRow:
-        uiLabel "Value Controls:"
-        uiSlider 0.5
-        uiProgressBar 0.75
-        # uiRating 4
+        uiLabel "Controls:"
+        uiCheckbox "Enable Feature", true
+        uiSlider 0.5, proc(v: float32) = echo "Slider: ", v
 
       uiRow:
-        uiLabel "Data Views:"
-        uiTabs @["Home", "Profile", "Settings"]
-        # uiListView @["Item 1", "Item 2", "Item 3"]
+        uiLabel "Text Entry:"
+        uiTextEdit "Edit me...", proc(t: string) = echo "Text changed: ", t
 
-  echo "Gallery created with components!"
+      uiRow:
+        uiLabel "Navigation:"
+        uiTabs @["Dashboard", "Reports", "Analytics"]
+
+  # Windy window setup
+  let w = newWindow("Nugui Gallery", ivec2(800, 600))
+  win.windyWindow = w
+  gui.windows.add(win)
+
+  while not w.closeRequested:
+    gui.processEvents()
+    gui.draw()
+    # Rendering would use pixie to draw win.node to w's framebuffer
+    w.swapBuffers()
+    pollEvents()
+
+  echo "Application finished."
 
 if isMainModule:
   main()
