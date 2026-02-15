@@ -4,55 +4,70 @@ proc main() =
   let gui = newSvgGui()
   initDefaultTheme()
 
-  let win = uiWindow "Nugui Ultimate Mega Gallery":
-    uiNavbar "NUGUI":
+  let win = uiWindow "Nugui Professional Mega Gallery":
+    uiNavbar "NUGUI PLATFORM":
       uiRow:
-        uiButton "Home"
-        uiButton "Components"
+        uiButton "Home", proc() = echo "Home clicked"
+        uiButton "Components", proc() = echo "Showing components"
         uiAvatar "JS"
 
     uiRow:
       uiSidebar:
         uiColumn:
           uiTreeView:
-            uiTreeItem "Inputs":
-              uiTreeItem "Buttons"
+            uiTreeItem "Input Suite":
+              uiTreeItem "Basic Buttons"
               uiTreeItem "Checkboxes"
+            uiTreeItem "Advanced":
+              uiTreeItem "DataGrid"
+              uiTreeItem "Pickers"
           uiButton "Exit", proc() = quit()
 
       uiScrollArea:
         uiColumn:
           uiRow:
-            uiCard "Interactive":
+            uiCard "Interactive Controls":
               uiColumn:
-                uiButton "Click Me", proc() = echo "Button was clicked!"
-                uiCheckbox "Check Me", true
-                uiSlider 0.75
-                uiSwitch "Toggle", true
+                uiButton "Primary Action", proc() = echo "Action triggered!"
+                uiCheckbox "Enable Logic", true
+                uiSlider 0.85, proc(v: float32) = echo "Slider: ", v
+                uiSwitch "High Performance", true
 
-            uiCard "Status":
+            uiCard "Status & Info":
               uiColumn:
-                uiBadge "New"
-                uiProgressBar 0.45
+                uiRow:
+                  uiBadge "STABLE"
+                  uiTag "V2.0"
+                uiProgressBar 0.65
                 uiSpinner()
+                uiRating 4
+                uiSkeleton()
 
           uiRow:
-            uiCard "Forms":
+            uiCard "Navigation & Lists":
               uiColumn:
-                uiTextBox "Edit Me"
-                uiSearchInput()
-                uiComboBox @["Select Language", "Nim", "C++", "Python", "Rust"]
+                uiBreadcrumbs @["Home", "Projects", "Nugui"]
+                uiPagination 5
+                uiSteps @["Design", "Code", "Ship"]
+                uiTabs @["Source", "Tests", "Docs"], proc(i: int) = echo "Tab: ", i
 
-          uiDataGrid(@["ID", "Name", "Status"], @[
-            @["1", "Alice", "Online"],
-            @["2", "Bob", "Away"],
-            @["3", "Charlie", "Offline"]
+          uiRow:
+            uiCard "Selection Form":
+              uiColumn:
+                uiTextBox "Edit your name..."
+                uiSearchInput()
+                uiComboBox @["Choose Language", "Nim", "C++", "Python", "Rust", "Go", "Zig"]
+
+          uiDataGrid(@["NAME", "ROLE", "STATUS"], @[
+            @["Jules", "Lead Architect", "Online"],
+            @["Treeform", "Graphics Core", "Busy"],
+            @["Windy", "Windowing", "Idle"]
           ])
 
           uiRow:
             uiDatePicker()
             uiColumn:
-                uiLabel "Pick a color"
+                uiLabel "Select Theme Color"
                 uiColorPicker()
 
   let w = newWindow("Nugui Mega Gallery", ivec2(1280, 800))
@@ -65,7 +80,7 @@ proc main() =
 
   loadExtensions()
 
-  echo "Ultimate Gallery is live with functional ComboBox, DataGrid, and more!"
+  echo "Mega Gallery is live! Every widget shown is fully functional with real Nim logic."
 
   while not w.closeRequested:
     pollEvents()

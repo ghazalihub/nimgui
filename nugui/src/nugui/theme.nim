@@ -9,7 +9,6 @@ const defaultThemeSVG* = """
     <g id="icon-check"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></g>
     <g id="icon-close"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></g>
     <g id="icon-search"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></g>
-    <g id="icon-star"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></g>
   </defs>
 
   <g id="pushbutton" class="pushbutton" layout="box">
@@ -19,57 +18,57 @@ const defaultThemeSVG* = """
 
   <g id="checkbox" class="checkbox" layout="box">
     <rect class="box" width="20" height="20" rx="2" fill="var(--base)" stroke="var(--light)" stroke-width="1"/>
-    <use class="checkmark" xlink:href="#icon-check" fill="var(--title)" visibility="hidden"/>
-    <text class="label" margin="0 8" fill="var(--text)">Checkbox</text>
+    <use class="checkmark" xlink:href="#icon-check" fill="var(--title)" visibility="hidden" x="2" y="2"/>
+    <text class="label" margin="0 8" fill="var(--text)" x="28" y="15">Checkbox</text>
   </g>
 
   <g id="radio" class="radio" layout="box">
     <circle class="outer" cx="10" cy="10" r="9" fill="var(--base)" stroke="var(--light)" stroke-width="1"/>
     <circle class="inner" cx="10" cy="10" r="5" fill="var(--title)" visibility="hidden"/>
-    <text class="label" margin="0 8" fill="var(--text)">Radio</text>
+    <text class="label" margin="0 8" fill="var(--text)" x="28" y="15">Radio</text>
   </g>
 
-  <g id="slider" class="slider" layout="box" box-anchor="hfill">
-    <rect class="track" box-anchor="hfill" y="16" width="200" height="4" rx="2" fill="var(--light)"/>
-    <g class="handle-container" box-anchor="left">
+  <g id="slider" class="slider" layout="box" box-anchor="hfill" height="36">
+    <rect class="track" box-anchor="hfill center" y="16" width="200" height="4" rx="2" fill="var(--light)"/>
+    <g class="handle-container" box-anchor="left center">
       <circle class="handle" cx="0" cy="18" r="10" fill="var(--text)" stroke="var(--title)" stroke-width="2"/>
     </g>
   </g>
 
-  <g id="textbox" class="textbox" layout="box" box-anchor="hfill">
+  <g id="textbox" class="textbox" layout="box" box-anchor="hfill" height="36">
     <rect class="background" box-anchor="fill" width="150" height="36" rx="4" fill="var(--base)" stroke="var(--light)" stroke-width="1"/>
-    <text class="content" box-anchor="left" margin="0 8" fill="var(--text)"></text>
+    <text class="content" box-anchor="left" margin="0 8" fill="var(--text)" y="22"></text>
   </g>
 
-  <g id="combobox" class="combobox" layout="box" box-anchor="hfill">
+  <g id="combobox" class="combobox" layout="box" box-anchor="hfill" height="36">
     <rect class="background" box-anchor="fill" width="150" height="36" rx="4" fill="var(--base)" stroke="var(--light)" stroke-width="1"/>
-    <text class="current-text" box-anchor="left" margin="0 8" fill="var(--text)">Select...</text>
-    <use xlink:href="#icon-chevron-down" box-anchor="right" margin="0 8" fill="var(--icon)"/>
+    <text class="current-text" box-anchor="left" margin="0 8" fill="var(--text)" y="22">Select...</text>
+    <use xlink:href="#icon-chevron-down" box-anchor="right" margin="0 8" fill="var(--icon)" x="125" y="6"/>
   </g>
 
   <g id="card" class="card" layout="flex" flex-direction="column">
     <rect class="background" box-anchor="fill" rx="8" fill="var(--window)"/>
-    <g class="header" margin="12 16" layout="box"></g>
-    <g class="body" margin="0 16 16 16" layout="flex" flex-direction="column"></g>
+    <g class="header" margin="12 16" layout="box" height="30"></g>
+    <g class="body" margin="0 16 16 16" layout="flex" flex-direction="column" flex-grow="1"></g>
   </g>
 
   <g id="datagrid" class="datagrid" layout="flex" flex-direction="column">
     <g class="header-row" layout="flex" flex-direction="row" height="32" fill="var(--dark)"></g>
-    <g class="rows" layout="flex" flex-direction="column"></g>
+    <g class="rows" layout="flex" flex-direction="column" flex-grow="1"></g>
   </g>
 
   <g id="carousel" class="carousel" layout="box">
     <rect class="bg" box-anchor="fill" fill="var(--base)"/>
     <g class="items" layout="flex" flex-direction="row"></g>
-    <use xlink:href="#icon-chevron-left" box-anchor="left" margin="0 8" fill="white"/>
-    <use xlink:href="#icon-chevron-right" box-anchor="right" margin="0 8" fill="white"/>
+    <use xlink:href="#icon-chevron-left" box-anchor="left" margin="0 8" fill="white" y="50%"/>
+    <use xlink:href="#icon-chevron-right" box-anchor="right" margin="0 8" fill="white" y="50%"/>
   </g>
 
   <g id="datepicker" class="datepicker" layout="flex" flex-direction="column" width="250">
     <rect class="bg" box-anchor="fill" rx="4" fill="var(--window)" stroke="var(--light)"/>
     <g class="header" layout="box" height="40">
         <use xlink:href="#icon-chevron-left" box-anchor="left" margin="0 8" fill="var(--icon)"/>
-        <text class="month-year" box-anchor="center" fill="var(--text)">October 2023</text>
+        <text class="month-year" box-anchor="center" fill="var(--text)" y="25">October 2023</text>
         <use xlink:href="#icon-chevron-right" box-anchor="right" margin="0 8" fill="var(--icon)"/>
     </g>
     <g class="grid" layout="flex" flex-direction="column" margin="8"></g>
@@ -83,21 +82,21 @@ const defaultThemeSVG* = """
   <g id="tree-item" class="tree-item" layout="flex" flex-direction="column">
     <g class="header" layout="flex" flex-direction="row" height="32">
         <use xlink:href="#icon-chevron-right" margin="0 4" fill="var(--icon)"/>
-        <text class="label" fill="var(--text)">Node</text>
+        <text class="label" fill="var(--text)" y="20">Node</text>
     </g>
   </g>
 
-  <g id="badge" class="badge" layout="box">
+  <g id="badge" class="badge" layout="box" height="20">
     <rect class="bg" box-anchor="fill" rx="10" fill="var(--title)"/>
-    <text class="label" margin="2 8" font-size="12" fill="white">0</text>
+    <text class="label" margin="2 8" font-size="12" fill="white" y="14">0</text>
   </g>
 
-  <g id="avatar" class="avatar">
+  <g id="avatar" class="avatar" width="40" height="40">
     <circle cx="20" cy="20" r="20" fill="var(--light)"/>
-    <text class="initials" x="20" y="24" text-anchor="middle" fill="white" font-size="16">JD</text>
+    <text class="initials" x="20" y="25" text-anchor="middle" fill="white" font-size="16">JD</text>
   </g>
 
-  <g id="progressbar" class="progressbar" layout="box" box-anchor="hfill">
+  <g id="progressbar" class="progressbar" layout="box" box-anchor="hfill" height="12">
     <rect class="background" box-anchor="fill" width="200" height="12" rx="6" fill="var(--base)"/>
     <rect class="fill" box-anchor="left vfill" width="0" height="12" rx="6" fill="var(--title)"/>
   </g>
@@ -109,7 +108,7 @@ const defaultThemeSVG* = """
 
   <g id="navbar" class="navbar" layout="box" height="64" box-anchor="hfill">
     <rect class="bg" box-anchor="fill" fill="var(--dark)"/>
-    <text class="logo" box-anchor="left" margin="0 24" font-weight="bold" fill="var(--title)">NUGUI</text>
+    <text class="logo" box-anchor="left" margin="0 24" font-weight="bold" fill="var(--title)" y="38">NUGUI</text>
   </g>
 
   <g id="sidebar" class="sidebar" layout="flex" flex-direction="column" width="240" box-anchor="vfill">
@@ -123,6 +122,13 @@ const defaultThemeSVG* = """
   <g id="scrollarea" class="scrollarea" layout="box">
     <g class="viewport" box-anchor="fill" layout="box"></g>
   </g>
+
+  <g id="popover" class="popover" layout="box">
+    <rect class="bg" box-anchor="fill" rx="4" fill="var(--window)" filter="drop-shadow(0 4px 8px rgba(0,0,0,0.2))"/>
+    <g class="content" margin="12" layout="box"></g>
+  </g>
+
+  <g id="rating" class="rating" layout="flex" flex-direction="row"></g>
 </svg>
 """
 
@@ -146,6 +152,7 @@ proc initDefaultTheme*() =
   styleRules.add StyleRule(selector: @[".pushbutton.hovered"], props: {"fill": "var(--hovered)"}.toTable)
   styleRules.add StyleRule(selector: @[".checkbox.checked .checkmark"], props: {"visibility": "visible"}.toTable)
   styleRules.add StyleRule(selector: @[".switch.checked .checkmark"], props: {"visibility": "visible"}.toTable)
+  styleRules.add StyleRule(selector: @[".active"], props: {"fill": "var(--title)"}.toTable)
 
 proc resolveVar(val: string): string =
   if val.startsWith("var("): themeVars.getOrDefault(val[4..^2], val) else: val
