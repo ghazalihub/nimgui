@@ -1,4 +1,4 @@
-import pixie, windy, vmath, vmath/rects, tables, sets, layout
+import pixie, windy, vmath, vmath/rects, tables, sets, layout, times, os
 
 type
   FocusReason* = enum
@@ -6,7 +6,9 @@ type
 
   EventKind* = enum
     evClick, evMouseDown, evMouseUp, evMouseMove, evKeyDown, evKeyUp, evScroll,
-    evMouseEnter, evMouseLeave, evFocusGained, evFocusLost, evTimer
+    evMouseEnter, evMouseLeave, evFocusGained, evFocusLost, evTimer,
+    evLongPress, evMultiTouch, evOutsideModal, evOutsidePressed,
+    evEnabled, evDisabled, evVisible, evInvisible, evScreenResized
 
   GuiEvent* = object
     kind*: EventKind
@@ -14,6 +16,19 @@ type
     button*: MouseButton
     keyCode*: KeyCode
     delta*: Vec2
+    timestamp*: float
+    touchId*: int
+    fingerId*: int
+    pressure*: float32
+    clicks*: int
+
+  TimerCallback* = proc(): int {.gcsafe.}
+
+  Timer* = object
+    nextTick*: float
+    period*: int
+    widget*: Widget
+    callback*: TimerCallback
 
   Widget* = ref object of RootObj
     node*: SvgNode
@@ -26,11 +41,19 @@ type
     layContain*: uint32
     layBehave*: uint32
     onEvent*: proc(w: Widget, event: GuiEvent): bool {.gcsafe.}
-    # Internal state
+
     isFocusable*: bool
     isPressedGroupContainer*: bool
     layoutTransform*: Mat3
     computedRect*: Rect
+    layoutIsolate*: bool
+    layoutVarsValid*: bool
+    attributes*: Table[string, string]
+
+  Window* = ref object of Widget
+    windyWindow*: windy.Window
+    gui*: SvgGui
+    absPosNodes*: seq[Widget]
 
   SvgGui* = ref object
     windows*: seq[Window]
@@ -38,11 +61,19 @@ type
     pressedWidget*: Widget
     hoveredWidget*: Widget
     focusedWidget*: Widget
+    menuStack*: seq[Widget]
+    lastClosedMenu*: Widget
 
-  Window* = ref object of Widget
-    windyWindow*: windy.Window
-    gui*: SvgGui
-    absPosNodes*: seq[Widget]
+    # Input state
+    prevFingerPos*: Vec2
+    totalFingerDist*: float32
+    fingerUpDnTime*: float
+    fingerClicks*: int
+    flingV*: Vec2
+
+    timers*: seq[Timer]
+    inputScale*: float32
+    paintScale*: float32
 
 proc newWidget*(node: SvgNode): Widget =
   new(result)
@@ -52,11 +83,17 @@ proc newWidget*(node: SvgNode): Widget =
   result.layoutId = LayInvalidId
   result.children = @[]
   result.layoutTransform = mat3()
+  result.layoutVarsValid = false
+  result.attributes = initTable[string, string]()
 
 proc newSvgGui*(): SvgGui =
   new(result)
   result.windows = @[]
   result.layoutCtx.initContext()
+  result.menuStack = @[]
+  result.timers = @[]
+  result.inputScale = 1.0
+  result.paintScale = 1.0
 
 proc addChild*(parent: Widget, child: Widget) =
   parent.children.add(child)
@@ -64,10 +101,39 @@ proc addChild*(parent: Widget, child: Widget) =
   if parent.node of SvgGroup:
     SvgGroup(parent.node).children.add(child.node)
 
-proc contains*(w: Widget, p: Vec2): bool =
-  # Use computedRect for hit testing
-  p.x >= w.computedRect.x and p.x <= w.computedRect.x + w.computedRect.w and
-  p.y >= w.computedRect.y and p.y <= w.computedRect.y + w.computedRect.h
+proc isDescendantOf*(w: Widget, parent: Widget): bool =
+  var curr = w
+  while curr != nil:
+    if curr == parent: return true
+    curr = curr.parent
+  return false
+
+proc getPressedGroupContainer(w: Widget): Widget =
+  var container = w
+  var curr = w
+  while curr.parent != nil:
+    curr = curr.parent
+    if curr.isPressedGroupContainer and curr.visible:
+      container = curr
+  return container
+
+proc setFocused*(gui: SvgGui, widget: Widget, reason: FocusReason = ReasonNone) =
+  var target = widget
+  while target != nil and not (target.isFocusable and target.enabled):
+    target = target.parent
+
+  if gui.focusedWidget == target: return
+
+  if gui.focusedWidget != nil:
+    discard gui.focusedWidget.onEvent(gui.focusedWidget, GuiEvent(kind: evFocusLost))
+
+  gui.focusedWidget = target
+  if target != nil:
+    discard target.onEvent(target, GuiEvent(kind: evFocusGained))
+
+proc setPressed*(gui: SvgGui, widget: Widget) =
+  gui.pressedWidget = if widget != nil: widget.getPressedGroupContainer() else: nil
+  gui.setFocused(widget, ReasonPressed)
 
 proc widgetAt*(w: Widget, p: Vec2): Widget =
   if not w.visible: return nil
@@ -79,50 +145,13 @@ proc widgetAt*(w: Widget, p: Vec2): Widget =
     if hit != nil: return hit
 
   # Check self
-  if w.contains(p): return w
+  if p.x >= w.computedRect.x and p.x <= w.computedRect.x + w.computedRect.w and
+     p.y >= w.computedRect.y and p.y <= w.computedRect.y + w.computedRect.h:
+    return w
   return nil
 
-proc setFocused*(gui: SvgGui, widget: Widget, reason: FocusReason = ReasonNone) =
-  if gui.focusedWidget == widget: return
-
-  if gui.focusedWidget != nil:
-    discard gui.focusedWidget.onEvent(gui.focusedWidget, GuiEvent(kind: evFocusLost))
-
-  gui.focusedWidget = widget
-  if widget != nil:
-    discard widget.onEvent(widget, GuiEvent(kind: evFocusGained))
-
-proc handleWindyEvent*(gui: SvgGui, win: Window, event: windy.Event) =
-  var guiEv: GuiEvent
-  case event.kind
-  of ButtonDown:
-    guiEv = GuiEvent(kind: evMouseDown, pos: event.pos, button: event.button)
-    let hit = win.widgetAt(event.pos)
-    if hit != nil:
-      gui.pressedWidget = hit
-      gui.setFocused(hit, ReasonPressed)
-      discard gui.dispatchEvent(hit, guiEv)
-  of ButtonUp:
-    guiEv = GuiEvent(kind: evMouseUp, pos: event.pos, button: event.button)
-    if gui.pressedWidget != nil:
-      discard gui.dispatchEvent(gui.pressedWidget, guiEv)
-      gui.pressedWidget = nil
-  of MouseMove:
-    guiEv = GuiEvent(kind: evMouseMove, pos: event.pos)
-    let hit = win.widgetAt(event.pos)
-    if hit != gui.hoveredWidget:
-      if gui.hoveredWidget != nil:
-        discard gui.dispatchEvent(gui.hoveredWidget, GuiEvent(kind: evMouseLeave))
-      gui.hoveredWidget = hit
-      if hit != nil:
-        discard gui.dispatchEvent(hit, GuiEvent(kind: evMouseEnter))
-    if hit != nil:
-      discard gui.dispatchEvent(hit, guiEv)
-  else:
-    discard
-
 proc dispatchEvent*(gui: SvgGui, w: Widget, event: GuiEvent): bool =
-  if not w.enabled: return false
+  if w == nil or not w.enabled: return false
   var curr = w
   while curr != nil:
     if curr.onEvent != nil:
@@ -131,19 +160,115 @@ proc dispatchEvent*(gui: SvgGui, w: Widget, event: GuiEvent): bool =
     curr = curr.parent
   return false
 
-# --- Rendering bridge (initial) ---
-# Will be expanded in renderer.nim
+proc updateGestures(gui: SvgGui, event: GuiEvent) =
+  let t = epochTime()
+  if event.kind == evMouseDown:
+    gui.flingV = vec2(0, 0)
+    gui.fingerClicks = if t - gui.fingerUpDnTime < 0.4 and event.pos.dist(gui.prevFingerPos) < 32:
+                         gui.fingerClicks + 1
+                       else: 1
+    gui.totalFingerDist = 0
+    gui.fingerUpDnTime = t
+    gui.lastClosedMenu = nil
+  elif event.kind == evMouseMove:
+    gui.totalFingerDist += event.pos.dist(gui.prevFingerPos)
+    if gui.totalFingerDist >= 20 or t - gui.fingerUpDnTime >= 0.4:
+      gui.fingerClicks = 0
+  elif event.kind == evMouseUp:
+    let dt = (t - gui.fingerUpDnTime).float32
+    if gui.totalFingerDist > 40 and dt > 0.03:
+      gui.flingV = (event.pos - gui.prevFingerPos) / dt
+    if gui.totalFingerDist >= 20 or t - gui.fingerUpDnTime >= 0.4:
+      gui.fingerClicks = 0
+  gui.prevFingerPos = event.pos
 
-proc processEvents*(gui: SvgGui) =
-  for win in gui.windows:
-    for event in win.windyWindow.events:
-      gui.handleWindyEvent(win, event)
+proc handleWindyEvent*(gui: SvgGui, win: Window, event: windy.Event) =
+  var guiEv = GuiEvent(timestamp: epochTime())
+  case event.kind
+  of ButtonDown:
+    guiEv.kind = evMouseDown
+    guiEv.pos = event.pos
+    guiEv.button = event.button
+    gui.updateGestures(guiEv)
+    let hit = win.widgetAt(event.pos)
+    if hit != nil:
+      gui.setPressed(hit)
+      discard gui.dispatchEvent(hit, guiEv)
+  of ButtonUp:
+    guiEv.kind = evMouseUp
+    guiEv.pos = event.pos
+    guiEv.button = event.button
+    gui.updateGestures(guiEv)
+    if gui.pressedWidget != nil:
+      discard gui.dispatchEvent(gui.pressedWidget, guiEv)
+      gui.pressedWidget = nil
+  of MouseMove:
+    guiEv.kind = evMouseMove
+    guiEv.pos = event.pos
+    gui.updateGestures(guiEv)
+    let hit = win.widgetAt(event.pos)
+    if hit != gui.hoveredWidget:
+      if gui.hoveredWidget != nil:
+        discard gui.dispatchEvent(gui.hoveredWidget, GuiEvent(kind: evMouseLeave))
+      gui.hoveredWidget = hit
+      if hit != nil:
+        discard gui.dispatchEvent(hit, GuiEvent(kind: evMouseEnter))
+    if gui.pressedWidget != nil:
+      discard gui.dispatchEvent(gui.pressedWidget, guiEv)
+    elif hit != nil:
+      discard gui.dispatchEvent(hit, guiEv)
+  else:
+    discard
+
+proc processTimers*(gui: SvgGui) =
+  let now = epochTime()
+  var i = 0
+  while i < gui.timers.len:
+    if gui.timers[i].nextTick <= now:
+      let period = if gui.timers[i].callback != nil:
+                     gui.timers[i].callback()
+                   else:
+                     if gui.dispatchEvent(gui.timers[i].widget, GuiEvent(kind: evTimer)):
+                       gui.timers[i].period
+                     else: 0
+      if period <= 0:
+        gui.timers.delete(i)
+        continue
+      else:
+        gui.timers[i].nextTick = now + period.float / 1000.0
+    i += 1
+
+proc setTimer*(gui: SvgGui, msec: int, widget: Widget, callback: TimerCallback = nil): ptr Timer =
+  var timer = Timer(period: msec, widget: widget, callback: callback)
+  timer.nextTick = epochTime() + msec.float / 1000.0
+  gui.timers.add(timer)
+  return addr gui.timers[^1]
+
+# --- Layout ---
+
+proc prepareLayout*(ctx: var LayContext, w: Widget): LayId =
+  let id = ctx.item()
+  w.layoutId = id
+  # Map attributes to lay flags
+  # ...
+  for child in w.children:
+    if child.visible:
+      let cid = ctx.prepareLayout(child)
+      ctx.insert(id, cid)
+  return id
+
+proc applyLayout*(ctx: var LayContext, w: Widget) =
+  if w.layoutId != LayInvalidId:
+    let r = ctx.getRect(w.layoutId)
+    w.computedRect = rect(r[0], r[1], r[2], r[3])
+  for child in w.children:
+    ctx.applyLayout(child)
 
 proc draw*(gui: SvgGui) =
+  gui.processTimers()
   gui.layoutCtx.resetContext()
   for win in gui.windows:
     let rootId = gui.layoutCtx.prepareLayout(win)
     gui.layoutCtx.setSize(rootId, [win.windyWindow.size.x.float32, win.windyWindow.size.y.float32])
     gui.layoutCtx.runContext()
     gui.layoutCtx.applyLayout(win)
-    # Rendering bridge call would go here

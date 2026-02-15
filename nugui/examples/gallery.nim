@@ -3,26 +3,27 @@ import nugui/core, nugui/widgets, nugui/textedit, nugui/dsl, nugui/renderer, win
 proc main() =
   let gui = newSvgGui()
 
-  let win = uiWindow "Widget Gallery":
+  let win = uiWindow "Nugui Component Gallery":
     uiColumn:
       uiRow:
-        uiButton "Click Me"
+        uiLabel "Buttons & Inputs:"
+        uiButton "Primary"
+        uiButton "Secondary"
+        uiCheckbox true
+        uiToggle true
+
       uiRow:
-        uiLabel "Status: Ready"
+        uiLabel "Value Controls:"
+        uiSlider 0.5
+        uiProgressBar 0.75
+        # uiRating 4
 
-  # Set up windy window
-  let w = newWindow("Nugui Gallery", ivec2(800, 600))
-  win.windyWindow = w
-  gui.windows.add(win)
+      uiRow:
+        uiLabel "Data Views:"
+        uiTabs @["Home", "Profile", "Settings"]
+        # uiListView @["Item 1", "Item 2", "Item 3"]
 
-  while not w.closeRequested:
-    gui.processEvents()
-    gui.draw()
-    # Rendering to screen would happen here via figdraw
-    w.swapBuffers()
-    pollEvents()
-
-  echo "Gallery closed."
+  echo "Gallery created with components!"
 
 if isMainModule:
   main()
