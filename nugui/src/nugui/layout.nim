@@ -58,6 +58,9 @@ proc initContext*(ctx: var LayContext) =
   ctx.items = @[]
   ctx.rects = @[]
 
+proc newLayoutContext*(): LayContext =
+  initContext(result)
+
 proc reserveItemsCapacity*(ctx: var LayContext, count: int) =
   ctx.items.reserveCapacity(count)
   ctx.rects.reserveCapacity(count)

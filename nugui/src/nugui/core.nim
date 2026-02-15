@@ -1,6 +1,7 @@
 import pixie, windy, vmath, vmath/rects, tables, sets, layout, times, os, strutils, opengl
 
-export windy.Key, windy.MouseButton, windy.Modifier, windy.mCtrl, windy.mShift, windy.mAlt
+export windy.Key, windy.MouseButton, windy.Modifier, windy.mCtrl, windy.mShift, windy.mAlt, windy.KeyCode
+export vmath.Vec2, vmath.Rect, vmath.rect, vmath.vec2
 
 type
   FocusReason* = enum
@@ -88,6 +89,13 @@ proc setPressed*(gui: SvgGui, widget: Widget)
 proc onHideWidget*(gui: SvgGui, widget: Widget)
 proc isDescendantOf*(w: Widget, parent: Widget): bool
 
+proc window*(w: Widget): Window =
+  var curr = w
+  while curr != nil:
+    if curr of Window: return Window(curr)
+    curr = curr.parent
+  return nil
+
 proc newWidget*(node: SvgNode = nil): Widget =
   new(result); result.node = if node != nil: node else: newSvgGroup()
   result.enabled = true; result.visible = true; result.layoutId = LayInvalidId
@@ -98,6 +106,12 @@ proc addChild*(parent: Widget, child: Widget) =
   parent.children.add(child); child.parent = parent
   if parent.node of SvgGroup: SvgGroup(parent.node).children.add(child.node)
   parent.isDirty = true
+
+proc addClass*(w: Widget, cls: string) =
+  for c in cls.splitWhitespace(): w.classes.incl(c)
+
+proc removeClass*(w: Widget, cls: string) =
+  for c in cls.splitWhitespace(): w.classes.excl(c)
 
 proc getPressedGroupContainer(w: Widget): Widget =
   var curr = w; while curr.parent != nil: (if curr.isPressedGroupContainer and curr.visible: return curr; curr = curr.parent)
@@ -158,7 +172,8 @@ proc setFocused*(gui: SvgGui, widget: Widget, reason: FocusReason = ReasonNone) 
   if gui.focusedWidget != nil: (var ev = GuiEvent(kind: evFocusLost); discard gui.focusedWidget.onEvent(gui.focusedWidget, ev))
   gui.focusedWidget = widget; if widget != nil: (var ev = GuiEvent(kind: evFocusGained); discard widget.onEvent(widget, ev))
 
-proc focusWidget*(win: Window, widget: Widget) = win.gui.setFocused(widget, ReasonPressed)
+proc focusWidget*(win: Window, widget: Widget) =
+    if win != nil and win.gui != nil: win.gui.setFocused(widget, ReasonPressed)
 
 proc setPressed*(gui: SvgGui, widget: Widget) =
   gui.pressedWidget = if widget != nil: widget.getPressedGroupContainer() else: nil

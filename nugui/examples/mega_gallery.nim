@@ -32,6 +32,7 @@ proc main() =
                 uiCheckbox "Enable Logic", true
                 uiSlider 0.85, proc(v: float32) = echo "Slider: ", v
                 uiSwitch "High Performance", true
+                uiRating 4
 
             uiCard "Status & Info":
               uiColumn:
@@ -40,7 +41,6 @@ proc main() =
                   uiTag "V2.0"
                 uiProgressBar 0.65
                 uiSpinner()
-                uiRating 4
                 uiSkeleton()
 
           uiRow:
@@ -50,13 +50,22 @@ proc main() =
                 uiPagination 5
                 uiSteps @["Design", "Code", "Ship"]
                 uiTabs @["Source", "Tests", "Docs"], proc(i: int) = echo "Tab: ", i
+                uiTimeline @["First Commit", "Alpha Release", "Production Build"]
 
           uiRow:
             uiCard "Selection Form":
               uiColumn:
                 uiTextBox "Edit your name..."
                 uiSearchInput()
-                uiComboBox @["Choose Language", "Nim", "C++", "Python", "Rust", "Go", "Zig"]
+                uiComboBox @["Choose Language", "Nim", "C++", "Python", "Rust", "Go", "Zig"], proc(i: int) = echo "Selected: ", i
+                uiFilePicker()
+
+          uiRow:
+            uiCard "Interactive Content":
+                uiCarousel:
+                    uiLabel "Slide 1: Welcome to Nugui"
+                    uiLabel "Slide 2: Powered by Pixie"
+                    uiLabel "Slide 3: Fast and SVG-based"
 
           uiDataGrid(@["NAME", "ROLE", "STATUS"], @[
             @["Jules", "Lead Architect", "Online"],
@@ -69,6 +78,9 @@ proc main() =
             uiColumn:
                 uiLabel "Select Theme Color"
                 uiColorPicker()
+            uiAccordion "More Details":
+                uiLabel "This library implements 46+ functional widgets."
+                uiButton "Close Details", proc() = echo "Details closed"
 
   let w = newWindow("Nugui Mega Gallery", ivec2(1280, 800))
   win.windyWindow = w

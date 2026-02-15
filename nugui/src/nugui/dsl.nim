@@ -13,6 +13,7 @@ proc currentParent(): Widget =
 
 template uiWindow*(titleStr: string, body: untyped): Window =
   let win = Window(visible: true, children: @[], node: newSvgGroup(), title: titleStr)
+  win.gui = newSvgGui() # Ensure gui is initialized for the root
   win.addClass("window")
   withParent(win):
     body
@@ -20,8 +21,8 @@ template uiWindow*(titleStr: string, body: untyped): Window =
 
 template uiColumn*(body: untyped) =
   let g = newWidget(newSvgGroup())
-  g.node.metadata["layout"] = "flex"
-  g.node.metadata["flex-direction"] = "column"
+  g.attributes["layout"] = "flex"
+  g.attributes["flex-direction"] = "column"
   let p = currentParent()
   if p != nil: p.addChild(g)
   withParent(g):
@@ -29,16 +30,15 @@ template uiColumn*(body: untyped) =
 
 template uiRow*(body: untyped) =
   let g = newWidget(newSvgGroup())
-  g.node.metadata["layout"] = "flex"
-  g.node.metadata["flex-direction"] = "row"
+  g.attributes["layout"] = "flex"
+  g.attributes["flex-direction"] = "row"
   let p = currentParent()
   if p != nil: p.addChild(g)
   withParent(g):
     body
 
 template uiButton*(titleStr: string, onClickedProc: proc() = nil) =
-  let b = newButton(titleStr)
-  b.onClicked = onClickedProc
+  let b = newButton(titleStr, onClickedProc)
   let p = currentParent()
   if p != nil: p.addChild(b)
 
@@ -70,8 +70,8 @@ template uiSlider*(val: float32 = 0.5, onChangeProc: proc(v: float32) = nil) =
   let p = currentParent()
   if p != nil: p.addChild(s)
 
-template uiRangeSlider*() =
-  let s = newRangeSlider()
+template uiRangeSlider*(v1, v2: float32) =
+  let s = newRangeSlider(v1, v2)
   let p = currentParent()
   if p != nil: p.addChild(s)
 
@@ -91,38 +91,41 @@ template uiTextBox*(textVal: string = "", onChangeProc: proc(t: string) = nil) =
   let p = currentParent()
   if p != nil: p.addChild(tb)
 
-template uiSearchInput*() =
-  let s = newSearchInput()
+template uiSearchInput*(textVal: string = "") =
+  let s = newSearchInput(textVal)
   let p = currentParent()
   if p != nil: p.addChild(s)
 
-template uiPasswordInput*() =
-  let s = newPasswordInput()
+template uiPasswordInput*(textVal: string = "") =
+  let s = newPasswordInput(textVal)
   let p = currentParent()
   if p != nil: p.addChild(s)
 
-template uiComboBox*(options: seq[string]) =
+template uiComboBox*(options: seq[string], onChange: proc(i: int) = nil) =
   let c = newComboBox(options)
+  c.onChanged = onChange
   let p = currentParent()
   if p != nil: p.addChild(c)
 
 template uiTabs*(titles: seq[string], onChange: proc(i: int) = nil) =
   let t = newTabs(titles)
-  t.onTabChanged = onChange
+  t.onChanged = onChange
   let p = currentParent()
   if p != nil: p.addChild(t)
 
 template uiAccordion*(titleStr: string, body: untyped) =
-  let ac = newAccordion(titleStr)
-  withParent(ac):
+  let content = newWidget(newSvgGroup())
+  withParent(content):
     body
+  let ac = newAccordion(titleStr, content)
   let p = currentParent()
   if p != nil: p.addChild(ac)
 
 template uiCard*(titleStr: string, body: untyped) =
-  let c = newCard(titleStr)
-  withParent(c):
+  let content = newWidget(newSvgGroup())
+  withParent(content):
     body
+  let c = newCard(titleStr, content)
   let p = currentParent()
   if p != nil: p.addChild(c)
 
@@ -147,11 +150,8 @@ template uiTreeView*(body: untyped) =
   let p = currentParent()
   if p != nil: p.addChild(tv)
 
-template uiTreeItem*(labelStr: string, body: untyped = nil) =
+template uiTreeItem*(labelStr: string) =
   let ti = newTreeItem(labelStr)
-  if body != nil:
-    withParent(ti):
-      body
   let p = currentParent()
   if p != nil: p.addChild(ti)
 
@@ -239,8 +239,8 @@ template uiSteps*(items: seq[string]) =
   let p = currentParent()
   if p != nil: p.addChild(st)
 
-template uiTimeline*() =
-  let tl = newTimeline()
+template uiTimeline*(items: seq[string]) =
+  let tl = newTimeline(items)
   let p = currentParent()
   if p != nil: p.addChild(tl)
 
@@ -249,15 +249,17 @@ template uiTagInput*() =
   let p = currentParent()
   if p != nil: p.addChild(ti)
 
-template uiCarousel*() =
-  let c = newCarousel()
-  let p = currentParent()
-  if p != nil: p.addChild(c)
+template uiCarousel*(body: untyped) =
+    let cont = newWidget()
+    withParent(cont): body
+    let c = newCarousel(cont.children)
+    let p = currentParent()
+    if p != nil: p.addChild(c)
 
 template uiPopOver*(body: untyped) =
-  let po = newPopOver()
-  withParent(po):
-    body
+  let cont = newWidget()
+  withParent(cont): body
+  let po = newPopOver(cont)
   let p = currentParent()
   if p != nil: p.addChild(po)
 
@@ -277,15 +279,20 @@ template uiNotification*(msgStr: string) =
   if p != nil: p.addChild(n)
 
 template uiModal*(titleStr: string, body: untyped) =
-  let m = newModal(titleStr)
-  withParent(m):
-    body
+  let cont = newWidget()
+  withParent(cont): body
+  let m = newModal(titleStr, cont)
   let p = currentParent()
   if p != nil: p.addChild(m)
 
 template uiDrawer*(body: untyped) =
-  let d = newDrawer()
-  withParent(d):
-    body
+  let cont = newWidget()
+  withParent(cont): body
+  let d = newDrawer(cont)
   let p = currentParent()
   if p != nil: p.addChild(d)
+
+template uiButtonGroup*(titles: seq[string]) =
+    let bg = newButtonGroup(titles)
+    let p = currentParent()
+    if p != nil: p.addChild(bg)

@@ -9,6 +9,7 @@ const defaultThemeSVG* = """
     <g id="icon-check"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></g>
     <g id="icon-close"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></g>
     <g id="icon-search"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></g>
+    <g id="icon-star"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></g>
   </defs>
 
   <g id="pushbutton" class="pushbutton" layout="box">
@@ -186,6 +187,10 @@ proc deepClone*(n: SvgNode): SvgNode =
   elif n of SvgUse: (let u = SvgUse(n); let res = newSvgUse(); res.x = u.x; res.y = u.y; res.width = u.width; res.height = u.height; res.href = u.href; res.metadata = u.metadata; return res)
   elif n of SvgCircle: (let c = SvgCircle(n); let res = newSvgCircle(); res.cx = c.cx; res.cy = c.cy; res.r = c.r; res.metadata = c.metadata; return res)
   elif n of SvgPath: (let p = SvgPath(n); let res = newSvgPath(); res.d = p.d; res.metadata = p.metadata; return res)
+  elif n of SvgEllipse: (let e = SvgEllipse(n); let res = newSvgEllipse(); res.cx = e.cx; res.cy = e.cy; res.rx = e.rx; res.ry = e.ry; res.metadata = e.metadata; return res)
+  elif n of SvgLine: (let l = SvgLine(n); let res = newSvgLine(); res.x1 = l.x1; res.y1 = l.y1; res.x2 = l.x2; res.y2 = l.y2; res.metadata = l.metadata; return res)
+  elif n of SvgPolygon: (let p = SvgPolygon(n); let res = newSvgPolygon(); res.points = p.points; res.metadata = p.metadata; return res)
+  elif n of SvgPolyline: (let p = SvgPolyline(n); let res = newSvgPolyline(); res.points = p.points; res.metadata = p.metadata; return res)
   return newSvgGroup()
 
 proc findNodeById*(root: SvgNode, id: string): SvgNode =
